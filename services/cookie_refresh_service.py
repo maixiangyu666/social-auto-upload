@@ -11,8 +11,10 @@ from datetime import datetime
 from pathlib import Path
 from queue import Queue
 from typing import List, Dict, Optional
-from conf import BASE_DIR
+from conf import BASE_DIR, LOCAL_CHROME_HEADLESS, LOCAL_CHROME_PATH
 from myUtils.auth import check_cookie
+from playwright.async_api import async_playwright
+from utils.base_social_media import set_init_script
 from services.account_service import AccountService
 from services.login_service import LoginService
 
@@ -32,8 +34,15 @@ class CookieRefreshService:
         conn.row_factory = sqlite3.Row
         return conn
     
-    def _log_refresh_result(self, account_id: int, platform_type: int, success: bool, 
-                           error_message: str = None, duration_ms: int = None):
+    def _log_refresh_result(
+        self,
+        account_id: int,
+        platform_type: int,
+        success: bool,
+        error_message: str = None,
+        duration_ms: int = None,
+        verify_method: str = 'auto_refresh',
+    ):
         """记录刷新结果到日志表"""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -48,13 +57,89 @@ class CookieRefreshService:
                 account_id,
                 platform_type,
                 1 if success else 0,
-                'auto_refresh',
+                verify_method,
                 error_message,
                 duration_ms
             ))
             conn.commit()
         finally:
             conn.close()
+
+    async def refresh_account_cookie_background(self, account_id: int) -> Dict:
+        """
+        后台无感刷新：基于已有 cookie(storage_state) 启动 Playwright，访问平台页面后导出最新 storage_state 覆盖保存。
+        - 若 cookie 已彻底失效，此方法通常无法自动恢复登录态，会返回失败并落日志，提示人工介入。
+        """
+        account = self.account_service.get_account_by_id(account_id)
+        if not account:
+            return {'success': False, 'message': '账号不存在'}
+
+        platform_type = int(account['type'])
+        cookie_name = account['filePath']
+        cookie_file = Path(BASE_DIR / "cookiesFile" / cookie_name)
+
+        start_time = datetime.now()
+        try:
+            if platform_type not in (1, 2, 3, 4):
+                return {'success': False, 'message': '该平台暂不支持后台无感刷新（仅支持 1-4）'}
+
+            if not cookie_name or not cookie_file.exists():
+                msg = 'Cookie文件不存在'
+                duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+                self._log_refresh_result(account_id, platform_type, False, msg, duration_ms, verify_method='auto_refresh_background')
+                return {'success': False, 'message': msg}
+
+            refresh_url_map = {
+                1: "https://creator.xiaohongshu.com/",
+                2: "https://channels.weixin.qq.com",
+                3: "https://creator.douyin.com/",
+                4: "https://cp.kuaishou.com",
+            }
+            url = refresh_url_map.get(platform_type)
+
+            async with async_playwright() as playwright:
+                options = {
+                    # 后台刷新强制 headless，避免在服务器/后台环境弹窗
+                    "headless": True,
+                }
+                # 如果配置了本地 Chromium 路径则优先使用
+                if LOCAL_CHROME_PATH and Path(LOCAL_CHROME_PATH).exists():
+                    options["executable_path"] = LOCAL_CHROME_PATH
+                browser = await playwright.chromium.launch(**options)
+                context = await browser.new_context(storage_state=str(cookie_file))
+                context = await set_init_script(context)
+                page = await context.new_page()
+
+                await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+                # 给平台一点时间做重定向/刷新 token
+                await page.wait_for_timeout(5_000)
+
+                # 覆盖导出最新 cookie
+                await context.storage_state(path=str(cookie_file))
+
+                await page.close()
+                await context.close()
+                await browser.close()
+
+            # 校验刷新后的 cookie 是否可用
+            ok = await check_cookie(platform_type, cookie_name)
+            duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+            if ok:
+                self._log_refresh_result(account_id, platform_type, True, None, duration_ms, verify_method='auto_refresh_background')
+                self.account_service.update_verify_time(account_id, True)
+                self.account_service.schedule_next_refresh(account_id)
+                return {'success': True, 'message': '后台刷新成功', 'new_file_path': cookie_name}
+            else:
+                msg = '后台刷新后Cookie验证失败（可能需要人工重新登录）'
+                self._log_refresh_result(account_id, platform_type, False, msg, duration_ms, verify_method='auto_refresh_background')
+                self.account_service.update_verify_time(account_id, False)
+                return {'success': False, 'message': msg}
+
+        except Exception as e:
+            duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+            msg = f'后台刷新异常: {str(e)}'
+            self._log_refresh_result(account_id, platform_type, False, msg, duration_ms, verify_method='auto_refresh_background')
+            return {'success': False, 'message': msg}
     
     async def refresh_account_cookie(self, account_id: int) -> Dict:
         """
@@ -167,6 +252,56 @@ class CookieRefreshService:
             })
         
         return results
+
+    async def batch_refresh_cookies_background(self, account_ids: List[int], concurrency: int = 1) -> Dict:
+        """批量后台无感刷新（并发受控）"""
+        results = {'total': len(account_ids), 'success': 0, 'failed': 0, 'details': []}
+        sem = asyncio.Semaphore(max(1, int(concurrency or 1)))
+
+        async def run_one(aid: int):
+            async with sem:
+                return await self.refresh_account_cookie_background(aid)
+
+        tasks = [asyncio.create_task(run_one(aid)) for aid in account_ids]
+        done = await asyncio.gather(*tasks, return_exceptions=True)
+        for aid, r in zip(account_ids, done):
+            if isinstance(r, Exception):
+                results['failed'] += 1
+                results['details'].append({'account_id': aid, 'success': False, 'message': f'后台刷新异常: {str(r)}'})
+                continue
+            if r.get('success'):
+                results['success'] += 1
+            else:
+                results['failed'] += 1
+            results['details'].append({'account_id': aid, **r})
+
+        return results
+
+    def get_refresh_logs(self, account_id: int, limit: int = 50, offset: int = 0) -> Dict:
+        """分页获取单账号刷新/验证日志"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "SELECT COUNT(1) as cnt FROM cookie_verification_log WHERE account_id = ?",
+                (account_id,),
+            )
+            total = int(cursor.fetchone()['cnt'])
+
+            cursor.execute(
+                """
+                SELECT *
+                FROM cookie_verification_log
+                WHERE account_id = ?
+                ORDER BY verify_time DESC
+                LIMIT ? OFFSET ?
+                """,
+                (account_id, limit, offset),
+            )
+            rows = [dict(r) for r in cursor.fetchall()]
+            return {"items": rows, "total": total, "limit": limit, "offset": offset}
+        finally:
+            conn.close()
     
     def get_accounts_need_refresh(self) -> List[Dict]:
         """

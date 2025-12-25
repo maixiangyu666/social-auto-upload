@@ -46,7 +46,7 @@
 
     <section class="rounded-2xl border border-slate-200 bg-white">
       <div class="border-b border-slate-200 px-4 py-3 text-sm font-semibold text-slate-900">
-        历史（{{ items.length }}）
+        历史（{{ total }}）
       </div>
       <div class="p-4">
         <div v-if="loading" class="text-sm text-slate-500">加载中...</div>
@@ -85,6 +85,35 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Pagination -->
+        <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div class="text-xs text-slate-600">
+            第 {{ page }} / {{ Math.max(1, Math.ceil(total / pageSize)) }} 页
+          </div>
+          <div class="flex items-center gap-2">
+            <select v-model.number="pageSize" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" @change="page = 1; reload()">
+              <option :value="10">10 / 页</option>
+              <option :value="20">20 / 页</option>
+              <option :value="50">50 / 页</option>
+              <option :value="100">100 / 页</option>
+            </select>
+            <button
+              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
+              :disabled="page <= 1"
+              @click="page = Math.max(1, page - 1); reload()"
+            >
+              上一页
+            </button>
+            <button
+              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
+              :disabled="page >= Math.max(1, Math.ceil(total / pageSize))"
+              @click="page = page + 1; reload()"
+            >
+              下一页
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   </div>
@@ -120,22 +149,30 @@ const filters = reactive({
 
 const loading = ref(false)
 const items = ref([])
+const total = ref(0)
+const pageSize = ref(20)
+const page = ref(1)
 
 const reload = async () => {
   loading.value = true
   try {
-    const params = { limit: 500, offset: 0 }
+    const params = { limit: pageSize.value, offset: (page.value - 1) * pageSize.value }
     if (filters.platform_type !== null) params.platform_type = filters.platform_type
-    // /listTasks 只能按单个 status 筛选。这里如果没选，就拿全部再筛。
-    if (filters.status !== null) params.status = filters.status
+    if (filters.status !== null) {
+      params.status = filters.status
+    } else {
+      // 不选时仅拉成功/失败作为“历史视图”
+      params.status_in = '2,3'
+    }
     const res = await taskApi.listTasks(params)
     if (res?.code !== 200) {
       toast.error(res?.msg || '加载失败')
       items.value = []
+      total.value = 0
       return
     }
-    const list = res.data ?? []
-    items.value = filters.status === null ? list.filter((t) => t.status === 2 || t.status === 3) : list
+    items.value = res.data?.items ?? []
+    total.value = res.data?.total ?? items.value.length
   } catch (e) {
     toast.error('加载失败')
   } finally {
@@ -146,6 +183,7 @@ const reload = async () => {
 const reset = async () => {
   filters.platform_type = null
   filters.status = null
+  page.value = 1
   await reload()
 }
 

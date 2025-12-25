@@ -3,8 +3,8 @@ import { http } from '@/utils/request'
 // 分组管理相关API
 export const groupApi = {
   // 获取分组列表
-  getGroups() {
-    return http.get('/api/groups')
+  getGroups(params = {}) {
+    return http.get('/api/groups', params)
   },
 
   // 获取分组详情

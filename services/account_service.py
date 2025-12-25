@@ -94,6 +94,96 @@ class AccountService:
             return accounts
         finally:
             conn.close()
+
+    def count_accounts(self, filters: Optional[Dict] = None) -> int:
+        """统计账号数量（与 get_accounts 同筛选条件）"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        try:
+            query = "SELECT COUNT(1) as cnt FROM user_info WHERE 1=1"
+            params = []
+
+            if filters:
+                if filters.get('platform_type'):
+                    query += " AND type = ?"
+                    params.append(filters['platform_type'])
+
+                if filters.get('status') is not None:
+                    query += " AND status = ?"
+                    params.append(filters['status'])
+
+                if filters.get('group_id') is not None:
+                    if filters['group_id'] == 0:
+                        query += " AND (group_id IS NULL OR group_id = 0)"
+                    else:
+                        query += " AND group_id = ?"
+                        params.append(filters['group_id'])
+
+                if filters.get('keyword'):
+                    keyword = f"%{filters['keyword']}%"
+                    query += " AND (userName LIKE ? OR filePath LIKE ?)"
+                    params.extend([keyword, keyword])
+
+            cursor.execute(query, params)
+            row = cursor.fetchone()
+            return int(row['cnt'] if row else 0)
+        finally:
+            conn.close()
+
+    def get_accounts_paginated(self, filters: Optional[Dict] = None, limit: int = 50, offset: int = 0) -> Dict:
+        """分页获取账号列表，返回 {items,total,limit,offset}"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        try:
+            base = "FROM user_info WHERE 1=1"
+            where = ""
+            params = []
+
+            if filters:
+                if filters.get('platform_type'):
+                    where += " AND type = ?"
+                    params.append(filters['platform_type'])
+
+                if filters.get('status') is not None:
+                    where += " AND status = ?"
+                    params.append(filters['status'])
+
+                if filters.get('group_id') is not None:
+                    if filters['group_id'] == 0:
+                        where += " AND (group_id IS NULL OR group_id = 0)"
+                    else:
+                        where += " AND group_id = ?"
+                        params.append(filters['group_id'])
+
+                if filters.get('keyword'):
+                    keyword = f"%{filters['keyword']}%"
+                    where += " AND (userName LIKE ? OR filePath LIKE ?)"
+                    params.extend([keyword, keyword])
+
+            cursor.execute(f"SELECT COUNT(1) as cnt {base} {where}", params)
+            total = int(cursor.fetchone()['cnt'])
+
+            cursor.execute(
+                f"SELECT * {base} {where} ORDER BY create_time DESC LIMIT ? OFFSET ?",
+                params + [limit, offset],
+            )
+            rows = cursor.fetchall()
+
+            items = []
+            for row in rows:
+                account = dict(row)
+                if account.get('tags'):
+                    try:
+                        account['tags'] = json.loads(account['tags'])
+                    except Exception:
+                        account['tags'] = []
+                else:
+                    account['tags'] = []
+                items.append(account)
+
+            return {"items": items, "total": total, "limit": limit, "offset": offset}
+        finally:
+            conn.close()
     
     def get_account_by_id(self, account_id: int) -> Optional[Dict]:
         """获取单个账号详情"""

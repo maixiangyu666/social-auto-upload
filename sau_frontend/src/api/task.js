@@ -9,7 +9,7 @@ export const taskApi = {
 
   // 查询任务列表
   listTasks(params = {}) {
-    return http.get('/listTasks', { params })
+    return http.get('/listTasks', params)
   },
 
   // 取消任务
@@ -20,6 +20,12 @@ export const taskApi = {
   // 重试任务
   retryTask(taskId) {
     return http.post(`/retryTask/${taskId}`)
+  },
+
+  // 删除任务（软删除）
+  deleteTask(taskId) {
+    // 后端兼容 DELETE/POST，这里用 DELETE
+    return http.delete(`/deleteTask/${taskId}`)
   }
 }
 

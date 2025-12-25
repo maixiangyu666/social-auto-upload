@@ -47,6 +47,29 @@ class GroupService:
             return groups
         finally:
             conn.close()
+
+    def get_groups_paginated(self, limit: int = 50, offset: int = 0) -> Dict:
+        """分页获取分组列表，返回 {items,total,limit,offset}"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT COUNT(1) as cnt FROM account_groups")
+            total = int(cursor.fetchone()['cnt'])
+
+            cursor.execute("""
+                SELECT g.*, COUNT(u.id) as account_count
+                FROM account_groups g
+                LEFT JOIN user_info u ON u.group_id = g.id
+                GROUP BY g.id
+                ORDER BY g.create_time ASC
+                LIMIT ? OFFSET ?
+            """, (limit, offset))
+
+            rows = cursor.fetchall()
+            items = [dict(row) for row in rows]
+            return {"items": items, "total": total, "limit": limit, "offset": offset}
+        finally:
+            conn.close()
     
     def get_group_by_id(self, group_id: int) -> Optional[Dict]:
         """获取单个分组详情"""

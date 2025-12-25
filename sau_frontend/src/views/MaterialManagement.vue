@@ -23,6 +23,7 @@
             v-model.trim="keyword"
             class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
             placeholder="搜索：文件名"
+            @keyup.enter="page = 1; load()"
           />
         </div>
 
@@ -39,7 +40,7 @@
 
     <section class="rounded-2xl border border-slate-200 bg-white">
       <div class="border-b border-slate-200 px-4 py-3 text-sm font-semibold text-slate-900">
-        素材（{{ filtered.length }}）
+        素材（{{ total }}）
       </div>
       <div class="p-4">
         <div v-if="loading" class="text-sm text-slate-500">加载中...</div>
@@ -78,6 +79,35 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Pagination -->
+        <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div class="text-xs text-slate-600">
+            第 {{ page }} / {{ Math.max(1, Math.ceil(total / pageSize)) }} 页
+          </div>
+          <div class="flex items-center gap-2">
+            <select v-model.number="pageSize" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" @change="page = 1; load()">
+              <option :value="10">10 / 页</option>
+              <option :value="20">20 / 页</option>
+              <option :value="50">50 / 页</option>
+              <option :value="100">100 / 页</option>
+            </select>
+            <button
+              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
+              :disabled="page <= 1"
+              @click="page = Math.max(1, page - 1); load()"
+            >
+              上一页
+            </button>
+            <button
+              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
+              :disabled="page >= Math.max(1, Math.ceil(total / pageSize))"
+              @click="page = page + 1; load()"
+            >
+              下一页
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   </div>
@@ -91,26 +121,32 @@ import { toast } from '@/utils/toast'
 const loading = ref(false)
 const list = ref([])
 const keyword = ref('')
+const total = ref(0)
+const pageSize = ref(20)
+const page = ref(1)
 
 const uploading = ref(false)
 const uploadProgress = ref(0)
 
-const filtered = computed(() => {
-  const kw = keyword.value.trim().toLowerCase()
-  if (!kw) return list.value
-  return list.value.filter((m) => String(m.filename || '').toLowerCase().includes(kw))
-})
+const filtered = computed(() => list.value)
 
 const load = async () => {
   loading.value = true
   try {
-    const res = await materialApi.getAllMaterials()
+    const res = await materialApi.getAllMaterials({
+      limit: pageSize.value,
+      offset: (page.value - 1) * pageSize.value,
+      keyword: keyword.value.trim() || undefined,
+    })
     if (res?.code !== 200) {
       toast.error(res?.msg || '加载失败')
       list.value = []
+      total.value = 0
       return
     }
-    list.value = res.data ?? []
+    const data = res.data || {}
+    list.value = data.items ?? []
+    total.value = data.total ?? list.value.length
   } catch (e) {
     toast.error('加载失败')
   } finally {
@@ -136,6 +172,7 @@ const onChooseFile = async (e) => {
     })
     if (res?.code === 200) {
       toast.success('上传成功')
+      page.value = 1
       await load()
     } else {
       toast.error(res?.msg || '上传失败')
@@ -148,9 +185,7 @@ const onChooseFile = async (e) => {
 }
 
 const preview = (m) => {
-  // preview URL expects filename, backend uses /getFile?filename=
-  const filename = String(m.file_path || '').split('/').pop()
-  const url = materialApi.getMaterialPreviewUrl(filename)
+  const url = materialApi.getMaterialPreviewUrl(m.file_path)
   window.open(url, '_blank')
 }
 
@@ -164,6 +199,8 @@ const remove = async (m) => {
   const res = await materialApi.deleteMaterial(m.id)
   if (res?.code === 200) {
     toast.success('已删除')
+    const maxPage = Math.max(1, Math.ceil((total.value - 1) / pageSize.value))
+    if (page.value > maxPage) page.value = maxPage
     await load()
   } else {
     toast.error(res?.msg || '删除失败')

@@ -4,7 +4,7 @@ import { http } from '@/utils/request'
 export const accountApi = {
   // 获取账号列表（支持筛选）
   getAccounts(filters = {}) {
-    return http.get('/api/accounts', { params: filters })
+    return http.get('/api/accounts', filters)
   },
 
   // 获取账号详情
@@ -38,8 +38,10 @@ export const accountApi = {
   },
 
   // 刷新Cookie
-  refreshCookie(id) {
-    return http.post(`/api/accounts/${id}/refresh-cookie`)
+  refreshCookie(id, { mode = 'background' } = {}) {
+    // mode: background | login
+    const qs = mode ? `?mode=${encodeURIComponent(mode)}` : ''
+    return http.post(`/api/accounts/${id}/refresh-cookie${qs}`)
   },
 
   // 批量刷新Cookie
@@ -55,5 +57,10 @@ export const accountApi = {
   // 更新账号分组
   updateAccountGroup(accountId, groupId) {
     return http.put(`/api/accounts/${accountId}`, { group_id: groupId })
+  },
+
+  // 获取 Cookie 刷新/验证日志（分页）
+  getCookieRefreshLogs(accountId, params = {}) {
+    return http.get(`/api/accounts/${accountId}/cookie-refresh-logs`, params)
   }
 }

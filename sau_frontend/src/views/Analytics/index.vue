@@ -78,7 +78,7 @@ const reload = async () => {
       tasks.value = []
       return
     }
-    tasks.value = res.data ?? []
+    tasks.value = res.data?.items ?? []
   } catch (e) {
     toast.error('加载失败')
   } finally {

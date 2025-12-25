@@ -240,30 +240,33 @@ const statCards = computed(() => [
 const go = (path) => router.push(path)
 
 const loadAccounts = async () => {
-  const res = await accountApi.getAccounts()
+  const res = await accountApi.getAccounts({ limit: 2000, offset: 0 })
   if (res?.code !== 200) return
-  const rows = res.data ?? []
-  accountStats.total = rows.length
+  const rows = res.data?.items ?? []
+  accountStats.total = res.data?.total ?? rows.length
   // 新接口返回的是对象数组
   accountStats.normal = rows.filter((r) => r.status === 1).length
   accountStats.abnormal = rows.filter((r) => r.status === 0).length
 }
 
 const loadMaterials = async () => {
-  const res = await materialApi.getAllMaterials()
+  const res = await materialApi.getAllMaterials({ limit: 1, offset: 0 })
   if (res?.code !== 200) return
-  contentStats.total = (res.data ?? []).length
+  const items = res.data?.items ?? []
+  const total = res.data?.total ?? items.length
+  contentStats.total = total
 }
 
 const loadTasks = async () => {
   const res = await taskApi.listTasks({ limit: 50, offset: 0 })
   if (res?.code !== 200) return
-  const tasks = res.data ?? []
-  taskStats.total = tasks.length
-  taskStats.completed = tasks.filter((t) => t.status === 2).length
-  taskStats.inProgress = tasks.filter((t) => t.status === 1).length
-  taskStats.failed = tasks.filter((t) => t.status === 3).length
-  recentTasks.value = tasks.slice(0, 10).map((t) => ({
+  const items = res.data?.items ?? []
+  const total = res.data?.total ?? items.length
+  taskStats.total = total
+  taskStats.completed = items.filter((t) => t.status === 2).length
+  taskStats.inProgress = items.filter((t) => t.status === 1).length
+  taskStats.failed = items.filter((t) => t.status === 3).length
+  recentTasks.value = items.slice(0, 10).map((t) => ({
     id: t.id,
     title: t.title,
     platform: platformName(t.platform_type),

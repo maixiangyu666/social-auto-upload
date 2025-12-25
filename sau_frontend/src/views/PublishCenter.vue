@@ -4,7 +4,7 @@
       <div>
         <div class="text-lg font-semibold text-slate-900">发布中心</div>
         <div class="text-xs text-slate-600">选择平台/账号/素材，一键创建发布任务（后台异步执行）</div>
-      </div>
+          </div>
       <div class="flex gap-2">
         <button
           type="button"
@@ -13,7 +13,7 @@
         >
           刷新数据
         </button>
-      </div>
+        </div>
     </header>
 
     <!-- Step 1: basic -->
@@ -30,8 +30,8 @@
           <div class="text-xs font-medium text-slate-600">标题</div>
           <input v-model.trim="form.title" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="例如：今天的剪辑作品" />
         </label>
-      </div>
-
+            </div>
+            
       <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
         <label class="space-y-1 md:col-span-2">
           <div class="text-xs font-medium text-slate-600">标签（逗号分隔，不带 #）</div>
@@ -42,7 +42,7 @@
           <input v-model="form.enableTimer" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
           开启定时发布（简化版）
         </label>
-      </div>
+            </div>
 
       <div v-if="form.enableTimer" class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
         <label class="space-y-1">
@@ -65,13 +65,13 @@
             >
               + 时间
             </button>
-          </div>
+                </div>
         </label>
         <label class="space-y-1">
           <div class="text-xs font-medium text-slate-600">从第几天开始（0=明天）</div>
           <input v-model.number="form.startDays" type="number" min="0" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
         </label>
-      </div>
+              </div>
     </section>
 
     <!-- Step 2: accounts -->
@@ -80,9 +80,9 @@
         <div>
           <div class="text-sm font-semibold text-slate-900">选择账号</div>
           <div class="text-xs text-slate-600">建议先在账号管理里校验有效性</div>
-        </div>
+              </div>
         <div class="text-xs text-slate-500">已选 {{ selectedAccounts.size }}</div>
-      </div>
+                        </div>
 
       <div class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
         <label
@@ -93,7 +93,7 @@
           <div class="min-w-0">
             <div class="truncate text-sm font-medium text-slate-900">{{ a.userName }}</div>
             <div class="truncate text-xs text-slate-600">{{ platformName(a.type) }} · {{ a.filePath }}</div>
-          </div>
+              </div>
           <input
             type="checkbox"
             class="h-4 w-4 rounded border-slate-300"
@@ -101,7 +101,7 @@
             @change="toggleAccount(a.filePath)"
           />
         </label>
-      </div>
+          </div>
     </section>
 
     <!-- Step 3: materials -->
@@ -110,9 +110,9 @@
         <div>
           <div class="text-sm font-semibold text-slate-900">选择素材</div>
           <div class="text-xs text-slate-600">多选会为每个账号×素材创建任务</div>
-        </div>
+          </div>
         <div class="text-xs text-slate-500">已选 {{ selectedFiles.size }}</div>
-      </div>
+          </div>
 
       <div class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
         <label
@@ -123,7 +123,7 @@
           <div class="min-w-0">
             <div class="truncate text-sm font-medium text-slate-900">{{ m.filename }}</div>
             <div class="truncate text-xs text-slate-600">{{ m.file_path }}</div>
-          </div>
+              </div>
           <input
             type="checkbox"
             class="h-4 w-4 rounded border-slate-300"
@@ -131,7 +131,7 @@
             @change="toggleFile(m.file_path)"
           />
         </label>
-      </div>
+          </div>
     </section>
 
     <!-- Submit -->
@@ -139,7 +139,7 @@
       <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div class="text-xs text-slate-600">
           将创建 <span class="font-semibold text-slate-900">{{ taskCount }}</span> 个任务
-        </div>
+                </div>
         <button
           type="button"
           class="rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
@@ -148,7 +148,7 @@
         >
           {{ submitting ? '提交中...' : '创建任务并开始执行' }}
         </button>
-      </div>
+                </div>
     </section>
   </div>
 </template>
@@ -222,10 +222,11 @@ const toggleFile = (filePath) => {
 }
 
 const loadAccounts = async () => {
-  const res = await accountApi.getAccounts()
+  // 发布中心用于选择账号，这里先取较大页（避免一次性全量造成卡顿）
+  const res = await accountApi.getAccounts({ limit: 2000, offset: 0 })
   if (res?.code !== 200) return []
   // 新接口返回的是对象数组，直接使用
-  return (res.data ?? []).map((r) => ({ 
+  return (res.data?.items ?? []).map((r) => ({ 
     id: r.id, 
     type: r.type, 
     filePath: r.filePath, 
@@ -235,9 +236,10 @@ const loadAccounts = async () => {
 }
 
 const loadMaterials = async () => {
-  const res = await materialApi.getAllMaterials()
+  // 发布中心用于选择素材，这里先取较大页（避免一次性全量造成卡顿）
+  const res = await materialApi.getAllMaterials({ limit: 1000, offset: 0 })
   if (res?.code !== 200) return []
-  return res.data ?? []
+  return res.data?.items ?? []
 }
 
 const reloadAll = async () => {

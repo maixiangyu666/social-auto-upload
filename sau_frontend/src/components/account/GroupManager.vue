@@ -102,9 +102,9 @@ const groupForm = ref({
 
 const loadGroups = async () => {
   try {
-    const res = await groupApi.getGroups()
-    if (res.data.code === 200) {
-      groups.value = res.data.data
+    const res = await groupApi.getGroups({ limit: 200, offset: 0 })
+    if (res?.code === 200) {
+      groups.value = res.data?.items || []
     }
   } catch (error) {
     toast.error('加载分组失败')
@@ -130,12 +130,12 @@ const handleDelete = async (group) => {
   
   try {
     const res = await groupApi.deleteGroup(group.id)
-    if (res.data.code === 200) {
+    if (res?.code === 200) {
       toast.success('删除成功')
       loadGroups()
       emit('refresh')
     } else {
-      toast.error(res.data.msg || '删除失败')
+      toast.error(res?.msg || '删除失败')
     }
   } catch (error) {
     toast.error('删除失败')
@@ -156,7 +156,7 @@ const handleSave = async () => {
       res = await groupApi.createGroup(groupForm.value)
     }
     
-    if (res.data.code === 200) {
+    if (res?.code === 200) {
       toast.success(editingGroup.value ? '更新成功' : '创建成功')
       showCreateModal.value = false
       editingGroup.value = null
@@ -164,7 +164,7 @@ const handleSave = async () => {
       loadGroups()
       emit('refresh')
     } else {
-      toast.error(res.data.msg || '操作失败')
+      toast.error(res?.msg || '操作失败')
     }
   } catch (error) {
     toast.error('操作失败')

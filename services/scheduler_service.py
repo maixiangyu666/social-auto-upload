@@ -7,6 +7,7 @@
 import threading
 import time
 import asyncio
+import os
 from datetime import datetime, timedelta
 from typing import Optional
 from services.cookie_refresh_service import CookieRefreshService
@@ -45,46 +46,26 @@ class SchedulerService:
         print("✅ Cookie刷新定时任务已停止")
     
     def _refresh_scheduler_loop(self):
-        """Cookie刷新调度循环"""
+        """Cookie刷新调度循环（可配置间隔）"""
+        interval_seconds = int(os.environ.get("COOKIE_REFRESH_CHECK_INTERVAL_SECONDS", "600"))
+        concurrency = int(os.environ.get("COOKIE_REFRESH_CONCURRENCY", "1"))
         while self._running:
             try:
-                # 计算到下次检查的时间（每天凌晨2点执行）
-                now = datetime.now()
-                next_check = now.replace(hour=2, minute=0, second=0, microsecond=0)
-                
-                # 如果已经过了今天凌晨2点，则设置为明天凌晨2点
-                if now >= next_check:
-                    next_check += timedelta(days=1)
-                
-                # 等待到指定时间
-                wait_seconds = (next_check - now).total_seconds()
-                print(f"⏰ 下次Cookie刷新检查时间: {next_check.strftime('%Y-%m-%d %H:%M:%S')}")
-                
-                # 每小时检查一次，如果到了凌晨2点就执行
-                check_interval = 3600  # 1小时
-                while self._running and wait_seconds > 0:
-                    sleep_time = min(check_interval, wait_seconds)
-                    time.sleep(sleep_time)
-                    wait_seconds -= sleep_time
-                    
-                    # 检查是否到了执行时间
-                    now = datetime.now()
-                    if now.hour == 2 and now.minute < 5:  # 凌晨2点-2点05分之间执行
-                        break
-                
-                if not self._running:
-                    break
-                
-                # 执行刷新任务
-                print(f"🔄 开始执行Cookie刷新任务: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                self.refresh_expired_cookies()
+                print(f"🔄 Cookie刷新检查开始: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (interval={interval_seconds}s, concurrency={concurrency})")
+                self.refresh_expired_cookies(concurrency=concurrency)
+
+                # 休眠到下一轮（支持提前停止）
+                slept = 0
+                while self._running and slept < interval_seconds:
+                    time.sleep(min(1, interval_seconds - slept))
+                    slept += 1
                 
             except Exception as e:
                 print(f"❌ Cookie刷新调度器出错: {e}")
-                # 出错后等待1小时再继续
-                time.sleep(3600)
+                # 出错后等待一小段时间再继续，避免打爆日志
+                time.sleep(30)
     
-    def refresh_expired_cookies(self):
+    def refresh_expired_cookies(self, concurrency: int = 1):
         """
         检查并刷新过期Cookie（每日执行）
         在定时任务中调用
@@ -104,10 +85,10 @@ class SchedulerService:
             asyncio.set_event_loop(loop)
             
             async def refresh_all():
-                results = await self.cookie_refresh_service.batch_refresh_cookies(
-                    [acc['id'] for acc in accounts]
+                return await self.cookie_refresh_service.batch_refresh_cookies_background(
+                    [acc['id'] for acc in accounts],
+                    concurrency=concurrency,
                 )
-                return results
             
             results = loop.run_until_complete(refresh_all())
             loop.close()

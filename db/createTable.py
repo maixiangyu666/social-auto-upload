@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS user_info (
             schedule_enabled INTEGER DEFAULT 0,      -- 是否定时发布：0否 1是
             scheduled_time DATETIME,                  -- 计划发布时间
             status INTEGER DEFAULT 0,                -- 状态：0待发布 1发布中 2成功 3失败 4已取消
+            is_deleted INTEGER DEFAULT 0,            -- 是否已删除：0否 1是（软删除）
             retry_count INTEGER DEFAULT 0,           -- 重试次数
             max_retry INTEGER DEFAULT 3,             -- 最大重试次数
             error_message TEXT,                       -- 错误信息

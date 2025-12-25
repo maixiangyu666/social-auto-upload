@@ -172,6 +172,8 @@ def get_accounts_api():
         status = request.args.get('status')
         group_id = request.args.get('group_id')
         keyword = request.args.get('keyword')
+        limit = request.args.get('limit', default=50, type=int)
+        offset = request.args.get('offset', default=0, type=int)
 
         if platform_type:
             filters['platform_type'] = int(platform_type)
@@ -182,7 +184,7 @@ def get_accounts_api():
         if keyword:
             filters['keyword'] = keyword
 
-        accounts = account_service.get_accounts(filters)
+        accounts = account_service.get_accounts_paginated(filters, limit=limit, offset=offset)
 
         return jsonify({
             "code": 200,
@@ -391,9 +393,13 @@ def refresh_cookie_api(account_id):
     """手动刷新Cookie"""
     try:
         cookie_refresh_service = CookieRefreshService()
+        mode = request.args.get('mode') or (request.get_json(silent=True) or {}).get('mode') or 'background'
 
         async def refresh():
-            return await cookie_refresh_service.refresh_account_cookie(account_id)
+            if mode == 'login':
+                return await cookie_refresh_service.refresh_account_cookie(account_id)
+            # 默认：后台无感刷新
+            return await cookie_refresh_service.refresh_account_cookie_background(account_id)
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -418,6 +424,19 @@ def refresh_cookie_api(account_id):
             "msg": f"刷新Cookie失败: {str(e)}",
             "data": None
         }), 500
+
+
+@account_bp.route('/api/accounts/<int:account_id>/cookie-refresh-logs', methods=['GET'])
+def get_cookie_refresh_logs(account_id: int):
+    """获取单账号 Cookie 刷新/验证日志（分页）"""
+    try:
+        limit = request.args.get('limit', default=50, type=int)
+        offset = request.args.get('offset', default=0, type=int)
+        cookie_refresh_service = CookieRefreshService()
+        data = cookie_refresh_service.get_refresh_logs(account_id, limit=limit, offset=offset)
+        return jsonify({"code": 200, "msg": "success", "data": data}), 200
+    except Exception as e:
+        return jsonify({"code": 500, "msg": f"获取日志失败: {str(e)}", "data": None}), 500
 
 
 @account_bp.route('/api/accounts/batch-refresh-cookie', methods=['POST'])

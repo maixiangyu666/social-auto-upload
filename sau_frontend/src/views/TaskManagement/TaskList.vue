@@ -122,10 +122,45 @@
                   >
                     重试
                   </button>
+                  <button
+                    class="ml-3 text-xs font-medium text-rose-700 hover:text-rose-900"
+                    @click="deleteTask(t)"
+                  >
+                    删除
+                  </button>
                 </td>
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div class="text-xs text-slate-600">
+            第 {{ page }} / {{ Math.max(1, Math.ceil(total / pageSize)) }} 页
+          </div>
+          <div class="flex items-center gap-2">
+            <select v-model.number="pageSize" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" @change="page = 1; reload()">
+              <option :value="10">10 / 页</option>
+              <option :value="20">20 / 页</option>
+              <option :value="50">50 / 页</option>
+              <option :value="100">100 / 页</option>
+            </select>
+            <button
+              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
+              :disabled="page <= 1"
+              @click="page = Math.max(1, page - 1); reload()"
+            >
+              上一页
+            </button>
+            <button
+              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
+              :disabled="page >= Math.max(1, Math.ceil(total / pageSize))"
+              @click="page = page + 1; reload()"
+            >
+              下一页
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -164,6 +199,8 @@ const filters = reactive({
 const loading = ref(false)
 const tasks = ref([])
 const total = ref(0)
+const pageSize = ref(20)
+const page = ref(1)
 
 const platformName = (type) =>
   ({
@@ -195,8 +232,8 @@ const statusPill = (s) => {
 
 const buildParams = () => {
   const params = {
-    limit: 200,
-    offset: 0,
+    limit: pageSize.value,
+    offset: (page.value - 1) * pageSize.value,
   }
   if (filters.platform_type !== null) params.platform_type = filters.platform_type
   if (filters.status !== null) params.status = filters.status
@@ -214,8 +251,9 @@ const reload = async () => {
       total.value = 0
       return
     }
-    tasks.value = res.data ?? []
-    total.value = tasks.value.length
+    const data = res.data || {}
+    tasks.value = data.items ?? []
+    total.value = data.total ?? tasks.value.length
   } catch (e) {
     toast.error('加载失败')
   } finally {
@@ -228,6 +266,7 @@ const reset = async () => {
   filters.platform_type = null
   filters.status = null
   filters.account_id = ''
+  page.value = 1
   await reload()
 }
 
@@ -252,6 +291,20 @@ const retryTask = async (t) => {
     await reload()
   } else {
     toast.error(res?.msg || '重试失败')
+  }
+}
+
+const deleteTask = async (t) => {
+  if (!confirm(`确定删除任务「${t.title}」吗？（软删除，可在数据库恢复）`)) return
+  const res = await taskApi.deleteTask(t.id)
+  if (res?.code === 200) {
+    toast.success('已删除')
+    // 如果删除导致当前页空了，自动回退一页
+    const maxPage = Math.max(1, Math.ceil((total.value - 1) / pageSize.value))
+    if (page.value > maxPage) page.value = maxPage
+    await reload()
+  } else {
+    toast.error(res?.msg || '删除失败')
   }
 }
 

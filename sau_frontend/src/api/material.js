@@ -3,8 +3,8 @@ import { http } from '@/utils/request'
 // 素材管理API
 export const materialApi = {
   // 获取所有素材
-  getAllMaterials: () => {
-    return http.get('/getFiles')
+  getAllMaterials: (params = {}) => {
+    return http.get('/getFiles', params)
   },
   
   // 上传素材
@@ -20,11 +20,12 @@ export const materialApi = {
   
   // 下载素材
   downloadMaterial: (filePath) => {
-    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5409'}/download/${filePath}`
+    // encodeURI 会保留路径分隔符 /，同时编码空格等字符
+    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5409'}/download/${encodeURI(filePath)}`
   },
   
   // 获取素材预览URL
-  getMaterialPreviewUrl: (filename) => {
-    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5409'}/getFile?filename=${filename}`
+  getMaterialPreviewUrl: (filePath) => {
+    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5409'}/getFile?file_path=${encodeURIComponent(filePath)}`
   }
 }

@@ -47,10 +47,30 @@ app.register_blueprint(task_bp)
 app.register_blueprint(group_bp)
 app.register_blueprint(video_bp)
 
+_scheduler = SchedulerService()
+
+
+def _should_start_scheduler() -> bool:
+    """
+    确保在以下场景启动一次 scheduler：
+    - python sau_backend.py
+    - flask run（避免 reloader 导致启动两次）
+    """
+    if os.environ.get("RUN_SCHEDULER", "1") != "1":
+        return False
+    # Flask reloader 子进程标记
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        return True
+    # 不开 reloader 时，WERKZEUG_RUN_MAIN 不存在；此时直接启动即可
+    if os.environ.get("FLASK_RUN_FROM_CLI") == "true" and os.environ.get("WERKZEUG_RUN_MAIN") is None:
+        return True
+    # 直接运行脚本
+    return __name__ == "__main__"
+
+
+if _should_start_scheduler():
+    _scheduler.start_cookie_refresh_scheduler()
+
 
 if __name__ == '__main__':
-    # 启动定时任务服务
-    scheduler = SchedulerService()
-    scheduler.start_cookie_refresh_scheduler()
-
     app.run(host='0.0.0.0', port=5409)

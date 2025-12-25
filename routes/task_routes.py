@@ -43,22 +43,43 @@ def list_tasks():
         platform_type = request.args.get('platform_type', type=int)
         account_id = request.args.get('account_id', type=int)
         status = request.args.get('status', type=int)
+        status_in = request.args.get('status_in')  # 例如 "2,3"
         limit = request.args.get('limit', default=100, type=int)
         offset = request.args.get('offset', default=0, type=int)
 
         task_service = TaskService()
+
+        status_in_list = None
+        if status_in:
+            try:
+                status_in_list = [int(s) for s in str(status_in).split(',') if str(s).strip() != '']
+            except Exception:
+                return jsonify({"code": 400, "msg": "status_in 参数格式错误", "data": None}), 400
+
         tasks = task_service.list_tasks(
             platform_type=platform_type,
             account_id=account_id,
             status=status,
+            status_in=status_in_list,
             limit=limit,
             offset=offset
+        )
+        total = task_service.count_tasks(
+            platform_type=platform_type,
+            account_id=account_id,
+            status=status,
+            status_in=status_in_list,
         )
 
         return jsonify({
             "code": 200,
             "msg": "success",
-            "data": tasks
+            "data": {
+                "items": tasks,
+                "total": total,
+                "limit": limit,
+                "offset": offset
+            }
         }), 200
     except Exception as e:
         return jsonify({
@@ -146,4 +167,17 @@ def retry_task(task_id):
             "msg": f"重试任务失败: {str(e)}",
             "data": None
         }), 500
+
+
+@task_bp.route('/deleteTask/<int:task_id>', methods=['DELETE', 'POST'])
+def delete_task(task_id):
+    """软删除任务（默认不再出现在列表中）"""
+    try:
+        task_service = TaskService()
+        ok = task_service.soft_delete_task(task_id)
+        if not ok:
+            return jsonify({"code": 404, "msg": "任务不存在", "data": None}), 404
+        return jsonify({"code": 200, "msg": "已删除", "data": None}), 200
+    except Exception as e:
+        return jsonify({"code": 500, "msg": f"删除任务失败: {str(e)}", "data": None}), 500
 

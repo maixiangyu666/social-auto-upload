@@ -24,6 +24,21 @@ class TaskService:
     
     def __init__(self):
         self.db_path = BASE_DIR / "db" / "database.db"
+        # 轻量 schema 自修复：避免本地库未重建导致缺列报错
+        self._ensure_schema()
+
+    def _ensure_schema(self):
+        """确保任务表具备必要字段（软删除等）"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("PRAGMA table_info(publish_tasks)")
+            cols = {row["name"] for row in cursor.fetchall()}
+            if "is_deleted" not in cols:
+                cursor.execute("ALTER TABLE publish_tasks ADD COLUMN is_deleted INTEGER DEFAULT 0")
+                conn.commit()
+        finally:
+            conn.close()
     
     def _get_connection(self):
         """获取数据库连接"""
@@ -299,8 +314,10 @@ class TaskService:
         platform_type: int = None,
         account_id: int = None,
         status: int = None,
+        status_in: List[int] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
+        include_deleted: bool = False,
     ) -> List[Dict]:
         """
         查询任务列表
@@ -322,6 +339,9 @@ class TaskService:
             where_clauses = []
             params = []
             
+            if not include_deleted:
+                where_clauses.append('is_deleted = 0')
+
             if platform_type is not None:
                 where_clauses.append('platform_type = ?')
                 params.append(platform_type)
@@ -333,6 +353,11 @@ class TaskService:
             if status is not None:
                 where_clauses.append('status = ?')
                 params.append(status)
+
+            if status_in:
+                placeholders = ",".join(["?"] * len(status_in))
+                where_clauses.append(f"status IN ({placeholders})")
+                params.extend(status_in)
             
             where_sql = ''
             if where_clauses:
@@ -349,6 +374,85 @@ class TaskService:
             
             rows = cursor.fetchall()
             return [self._row_to_dict(row) for row in rows]
+        finally:
+            conn.close()
+
+    def count_tasks(
+        self,
+        platform_type: int = None,
+        account_id: int = None,
+        status: int = None,
+        status_in: List[int] = None,
+        include_deleted: bool = False,
+    ) -> int:
+        """统计任务数量（与 list_tasks 同筛选条件）"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        try:
+            where_clauses = []
+            params = []
+
+            if not include_deleted:
+                where_clauses.append("is_deleted = 0")
+
+            if platform_type is not None:
+                where_clauses.append("platform_type = ?")
+                params.append(platform_type)
+
+            if account_id is not None:
+                where_clauses.append("account_id = ?")
+                params.append(account_id)
+
+            if status is not None:
+                where_clauses.append("status = ?")
+                params.append(status)
+
+            if status_in:
+                placeholders = ",".join(["?"] * len(status_in))
+                where_clauses.append(f"status IN ({placeholders})")
+                params.extend(status_in)
+
+            where_sql = ""
+            if where_clauses:
+                where_sql = "WHERE " + " AND ".join(where_clauses)
+
+            cursor.execute(f"SELECT COUNT(1) as cnt FROM publish_tasks {where_sql}", params)
+            row = cursor.fetchone()
+            return int(row["cnt"] if row else 0)
+        finally:
+            conn.close()
+
+    def soft_delete_task(self, task_id: int) -> bool:
+        """
+        软删除任务：
+        - 若任务为待发布/发布中，则先标记为已取消
+        - 最终设置 is_deleted=1
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT id, status FROM publish_tasks WHERE id = ?", (task_id,))
+            row = cursor.fetchone()
+            if not row:
+                return False
+
+            updates = ["is_deleted = 1", "update_time = CURRENT_TIMESTAMP"]
+            params = []
+
+            if row["status"] in (self.STATUS_PENDING, self.STATUS_RUNNING):
+                updates.append("status = ?")
+                params.append(self.STATUS_CANCELLED)
+
+            params.append(task_id)
+            cursor.execute(
+                f"UPDATE publish_tasks SET {', '.join(updates)} WHERE id = ?",
+                params,
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
     

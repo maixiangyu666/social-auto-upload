@@ -13,7 +13,9 @@ def get_groups_api():
     """获取所有分组"""
     try:
         group_service = GroupService()
-        groups = group_service.get_groups()
+        limit = request.args.get('limit', default=50, type=int)
+        offset = request.args.get('offset', default=0, type=int)
+        groups = group_service.get_groups_paginated(limit=limit, offset=offset)
 
         return jsonify({
             "code": 200,
