@@ -64,8 +64,8 @@ async def douyin_cookie_gen(id, status_queue):
         await page.close()
         await context.close()
         await browser.close()
-        status_queue.put(json.dumps({"event": "success", "code": 200, "msg": "登录成功"}, ensure_ascii=False))
-        status_queue.put("200")
+        # 注意：这里不要推送 success（避免前端提前认为“登录完成”）
+        # success 由 services/login_service.py 在“入库成功”后统一推送
         return f"{uuid_v1}.json"
 
 
@@ -136,8 +136,7 @@ async def get_tencent_cookie(id, status_queue):
         await page.close()
         await context.close()
         await browser.close()
-        status_queue.put(json.dumps({"event": "success", "code": 200, "msg": "登录成功"}, ensure_ascii=False))
-        status_queue.put("200")
+        # success 由 LoginService 在入库成功后统一推送
         return f"{uuid_v1}.json"
 
 # 快手登录
@@ -203,8 +202,7 @@ async def get_ks_cookie(id, status_queue):
         await page.close()
         await context.close()
         await browser.close()
-        status_queue.put(json.dumps({"event": "success", "code": 200, "msg": "登录成功"}, ensure_ascii=False))
-        status_queue.put("200")
+        # success 由 LoginService 在入库成功后统一推送
         return f"{uuid_v1}.json"
 
 # 小红书登录
@@ -270,8 +268,7 @@ async def xiaohongshu_cookie_gen(id, status_queue):
         await page.close()
         await context.close()
         await browser.close()
-        status_queue.put(json.dumps({"event": "success", "code": 200, "msg": "登录成功"}, ensure_ascii=False))
-        status_queue.put("200")
+        # success 由 LoginService 在入库成功后统一推送
         return f"{uuid_v1}.json"
 
 
@@ -320,8 +317,7 @@ async def baijiahao_cookie_gen_with_sse(account_name, status_queue, *, session_i
             status_queue.put(json.dumps({"event": "error", "code": 500, "msg": "Cookie验证失败"}, ensure_ascii=False))
             return None
 
-        status_queue.put(json.dumps({"event": "success", "code": 200, "msg": "登录成功"}, ensure_ascii=False))
-        status_queue.put("200")
+        # success 由 LoginService 在入库成功后统一推送
         return f"{uuid_v1}.json"
 
 
@@ -363,8 +359,7 @@ async def tiktok_cookie_gen_with_sse(account_name, status_queue, *, session_id: 
             status_queue.put(json.dumps({"event": "error", "code": 500, "msg": "Cookie验证失败"}, ensure_ascii=False))
             return None
 
-        status_queue.put(json.dumps({"event": "success", "code": 200, "msg": "登录成功"}, ensure_ascii=False))
-        status_queue.put("200")
+        # success 由 LoginService 在入库成功后统一推送
         return f"{uuid_v1}.json"
 
 # a = asyncio.run(xiaohongshu_cookie_gen(4,None))

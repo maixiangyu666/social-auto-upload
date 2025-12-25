@@ -256,7 +256,8 @@ if __name__ == "__main__":
     # 直接运行此脚本时执行初始化
     success, message = init_database()
     if success:
-        print("✅ " + message)
+        # Windows 默认控制台可能是 GBK，打印 emoji 会触发 UnicodeEncodeError
+        print("[OK] " + message)
     else:
-        print("❌ " + message)
+        print("[ERR] " + message)
         exit(1)

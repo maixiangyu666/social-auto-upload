@@ -174,6 +174,8 @@ class LoginService:
                 push({"event": "success", "code": 200, "msg": "刷新 Cookie 成功", "account_id": account_id, "filePath": cookie_file})
                 return {"success": True, "account_id": account_id, "filePath": cookie_file}
 
+            # 新增账号：必须入库成功后才推送 success
+            print(f"[LoginService] creating account: type={platform_type}, userName={account_name}, filePath={cookie_file}")
             new_id = self.account_service.create_account(
                 {
                     "type": platform_type,
@@ -187,6 +189,12 @@ class LoginService:
             push({"event": "success", "code": 200, "msg": "登录成功", "account_id": new_id, "filePath": cookie_file})
             return {"success": True, "account_id": new_id, "filePath": cookie_file}
 
+        except Exception as e:
+            # 任何异常都要明确推送给前端（否则前端可能停留在“成功/无响应”）
+            import traceback
+            traceback.print_exc()
+            push({"event": "error", "code": 500, "msg": f"登录/入库异常: {str(e)}"})
+            return {"success": False, "message": str(e)}
         finally:
             if session_id:
                 self.cleanup_manual_session(session_id)
