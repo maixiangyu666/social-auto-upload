@@ -295,7 +295,7 @@ const retryTask = async (t) => {
 }
 
 const deleteTask = async (t) => {
-  if (!confirm(`确定删除任务「${t.title}」吗？（软删除，可在数据库恢复）`)) return
+  if (!confirm(`确定删除任务「${t.title}」吗？`)) return
   const res = await taskApi.deleteTask(t.id)
   if (res?.code === 200) {
     toast.success('已删除')
