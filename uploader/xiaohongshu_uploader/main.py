@@ -18,9 +18,9 @@ async def cookie_auth(account_file):
         # 创建一个新的页面
         page = await context.new_page()
         # 访问指定的 URL
-        await page.goto("https://creator.xiaohongshu.com/creator-micro/content/upload")
+        await page.goto("https://creator.xiaohongshu.com/publish/publish?from=menu&target=video")
         try:
-            await page.wait_for_url("https://creator.xiaohongshu.com/creator-micro/content/upload", timeout=5000)
+            await page.wait_for_url("https://creator.xiaohongshu.com/publish/publish?from=menu&target=video", timeout=5000)
         except:
             print("[+] 等待5秒 cookie 失效")
             await context.close()
@@ -175,7 +175,7 @@ class XiaoHongShuVideo(object):
             await page.keyboard.press("Delete")
             await page.keyboard.type(self.title)
             await page.keyboard.press("Enter")
-        css_selector = ".ql-editor" # 不能加上 .ql-blank 属性，这样只能获取第一次非空状态
+        css_selector = ".editor-content" # 不能加上 .ql-blank 属性，这样只能获取第一次非空状态
         for index, tag in enumerate(self.tags, start=1):
             await page.type(css_selector, "#" + tag)
             await page.press(css_selector, "Space")

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
+from pathlib import Path
 
 from playwright.async_api import Playwright, async_playwright, Page
 import os
@@ -103,14 +104,32 @@ class DouYinVideo(object):
             browser = await playwright.chromium.launch(headless=self.headless, executable_path=self.local_executable_path)
         else:
             browser = await playwright.chromium.launch(headless=self.headless)
+        
+        # 确保 account_file 是绝对路径字符串
+        account_file_path = str(Path(self.account_file).resolve())
+        
+        # 检查文件是否存在
+        if not Path(account_file_path).exists():
+            douyin_logger.error(f'[!] Cookie 文件不存在: {account_file_path}')
+            await browser.close()
+            raise FileNotFoundError(f'Cookie 文件不存在: {account_file_path}')
+        
+        douyin_logger.info(f'[+] 使用 Cookie 文件: {account_file_path}')
+        
         # 创建一个浏览器上下文，使用指定的 cookie 文件
-        context = await browser.new_context(storage_state=f"{self.account_file}")
+        try:
+            context = await browser.new_context(storage_state=account_file_path)
+        except Exception as e:
+            douyin_logger.error(f'[!] 加载 Cookie 文件失败: {e}')
+            await browser.close()
+            raise
         context = await set_init_script(context)
 
         # 创建一个新的页面
         page = await context.new_page()
-        # 访问指定的 URL
-        await page.goto("https://creator.douyin.com/creator-micro/content/upload")
+        # 🔍 在这里添加 pause 来调试 cookie 加载
+        await page.pause()  # 会打开 Playwright Inspector
+
         douyin_logger.info(f'[+]正在上传-------{self.title}.mp4')
         # 等待页面跳转到指定的 URL，没进入，则自动等待到超时
         douyin_logger.info(f'[-] 正在打开主页...')
@@ -219,7 +238,7 @@ class DouYinVideo(object):
                 await page.screenshot(full_page=True)
                 await asyncio.sleep(0.5)
 
-        await context.storage_state(path=self.account_file)  # 保存cookie
+        await context.storage_state(path=account_file_path)  # 保存cookie
         douyin_logger.success('  [-]cookie更新完毕！')
         await asyncio.sleep(2)  # 这里延迟是为了方便眼睛直观的观看
         # 关闭浏览器上下文和浏览器实例

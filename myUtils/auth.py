@@ -88,9 +88,9 @@ async def cookie_auth_xhs(account_file):
         # 创建一个新的页面
         page = await context.new_page()
         # 访问指定的 URL
-        await page.goto("https://creator.xiaohongshu.com/creator-micro/content/upload")
+        await page.goto("https://creator.xiaohongshu.com/publish/publish?from=menu&target=video")
         try:
-            await page.wait_for_url("https://creator.xiaohongshu.com/creator-micro/content/upload", timeout=5000)
+            await page.wait_for_url("https://creator.xiaohongshu.com/publish/publish?from=menu&target=video", timeout=5000)
         except:
             print("[+] 等待5秒 cookie 失效")
             await context.close()

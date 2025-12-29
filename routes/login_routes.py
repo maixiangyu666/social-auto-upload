@@ -164,7 +164,7 @@ def login_status(session_id):
 
 
 @login_bp.route('/api/accounts/<int:account_id>/refresh-cookie-with-login', methods=['POST'])
-def refresh_cookie_with_login(account_id: int):
+def refresh_cookie_with_login(account_id: int) -> tuple[Response, int]:
     """
     刷新Cookie（复用登录流程）
     返回 session_id，前端通过轮询 /api/accounts/login/status/<session_id> 获取进度
