@@ -1,4 +1,5 @@
 # social-auto-upload
+本项目基于https://github.com/dreammis/social-auto-upload.git  后期项目完整会合并到此项目 此项目作为临时GIT管理
 
 `social-auto-upload` 是一个强大的自动化工具，旨在帮助内容创作者和运营者高效地将视频内容一键发布到多个国内外主流社交媒体平台。
 项目实现了对 `抖音`、`Bilibili`、`小红书`、`快手`、`视频号`、`百家号` 以及 `TikTok` 等平台的视频上传、定时发布等功能。
