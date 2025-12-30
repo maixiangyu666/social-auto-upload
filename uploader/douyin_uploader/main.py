@@ -128,7 +128,7 @@ class DouYinVideo(object):
         # 创建一个新的页面
         page = await context.new_page()
         # 🔍 在这里添加 pause 来调试 cookie 加载
-        await page.pause()  # 会打开 Playwright Inspector
+        # await page.pause()  # 会打开 Playwright Inspector
 
         douyin_logger.info(f'[+]正在上传-------{self.title}.mp4')
         # 等待页面跳转到指定的 URL，没进入，则自动等待到超时
