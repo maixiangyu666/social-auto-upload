@@ -40,6 +40,30 @@
               打开链接
             </a>
           </InfoItem>
+          
+          <!-- 抖音平台专用字段 -->
+          <template v-if="task.platform_type === 3">
+            <InfoItem v-if="task.thumbnail_path" label="封面路径" class="md:col-span-2">
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-slate-900 truncate">{{ task.thumbnail_path }}</span>
+                <a
+                  :href="getThumbnailUrl(task.thumbnail_path)"
+                  target="_blank"
+                  class="text-xs font-medium text-indigo-700 hover:text-indigo-900"
+                >
+                  预览
+                </a>
+              </div>
+            </InfoItem>
+            <InfoItem v-if="task.product_link" label="商品链接" class="md:col-span-2">
+              <a :href="task.product_link" target="_blank" class="text-sm font-medium text-indigo-700 hover:text-indigo-900 break-all">
+                {{ task.product_link }}
+              </a>
+            </InfoItem>
+            <InfoItem v-if="task.product_title" label="商品标题" class="md:col-span-2">
+              {{ task.product_title }}
+            </InfoItem>
+          </template>
         </div>
 
         <div v-if="task.error_message" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
@@ -160,6 +184,11 @@ const retry = async () => {
 }
 
 const goBack = () => router.push('/task-management')
+
+const getThumbnailUrl = (filePath) => {
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5409'
+  return `${apiBaseUrl}/getFile?file_path=${encodeURIComponent(filePath)}`
+}
 
 onMounted(reload)
 
