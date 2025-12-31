@@ -131,11 +131,131 @@ class DouYinVideo(object):
         # await page.pause()  # 会打开 Playwright Inspector
 
         douyin_logger.info(f'[+]正在上传-------{self.title}.mp4')
-        # 等待页面跳转到指定的 URL，没进入，则自动等待到超时
         douyin_logger.info(f'[-] 正在打开主页...')
-        await page.wait_for_url("https://creator.douyin.com/creator-micro/content/upload")
-        # 点击 "上传视频" 按钮
-        await page.locator("div[class^='container'] input").set_input_files(self.file_path)
+        
+        # 导航到目标 URL
+        try:
+            await page.goto("https://creator.douyin.com/creator-micro/content/upload", 
+                          wait_until='domcontentloaded',
+                          timeout=30000)
+            douyin_logger.info('[+] 页面导航成功')
+        except Exception as e:
+            douyin_logger.error(f'[!] 页面导航失败: {e}')
+            # 检查是否跳转到登录页
+            current_url = page.url
+            douyin_logger.error(f'[!] 当前 URL: {current_url}')
+            if "login" in current_url.lower() or "passport" in current_url.lower():
+                douyin_logger.error('[!] 检测到跳转到登录页面，Cookie 可能已失效')
+                await page.screenshot(path="debug_login_redirect.png", full_page=True)
+                raise Exception("Cookie 失效，需要重新登录")
+            raise
+        
+        # 检查是否出现登录提示
+        try:
+            await asyncio.sleep(1)  # 等待页面渲染
+            if await page.get_by_text('手机号登录').count() > 0 or await page.get_by_text('扫码登录').count() > 0:
+                douyin_logger.error('[!] 检测到登录页面，Cookie 已失效')
+                await page.screenshot(path="debug_login_detected.png", full_page=True)
+                raise Exception("Cookie 失效，需要重新登录")
+        except Exception as e:
+            if "Cookie" in str(e):
+                raise
+            # 其他异常忽略，继续执行
+        
+        # 等待页面完全加载
+        try:
+            await page.wait_for_load_state('networkidle', timeout=10000)
+        except Exception as e:
+            douyin_logger.warning(f'[!] 等待 networkidle 超时，继续执行: {e}')
+        
+        await asyncio.sleep(1)  # 额外等待确保页面渲染完成
+        
+        # 尝试多种方式上传文件
+        upload_success = False
+        
+        # 方式1: 通过按钮文本定位并使用文件选择器（推荐）
+        try:
+            upload_button = page.get_by_role("button", name="上传视频")
+            if await upload_button.count() > 0:
+                await upload_button.wait_for(state='visible', timeout=5000)
+                douyin_logger.info('[+] 通过文本定位到上传按钮，准备上传文件...')
+                
+                async with page.expect_file_chooser(timeout=10000) as fc_info:
+                    await upload_button.click()
+                file_chooser = await fc_info.value
+                await file_chooser.set_files(self.file_path)
+                upload_success = True
+                douyin_logger.info('[+] 文件上传成功（方式1：按钮+文件选择器）')
+        except Exception as e:
+            douyin_logger.warning(f'[!] 方式1失败: {e}')
+        
+        # 方式2: 通过类名定位按钮（兼容哈希变化）
+        if not upload_success:
+            try:
+                upload_button = page.locator("button[class*='container-drag-btn']").first
+                if await upload_button.count() > 0:
+                    await upload_button.wait_for(state='visible', timeout=5000)
+                    douyin_logger.info('[+] 通过类名定位到上传按钮，准备上传文件...')
+                    
+                    async with page.expect_file_chooser(timeout=10000) as fc_info:
+                        await upload_button.click()
+                    file_chooser = await fc_info.value
+                    await file_chooser.set_files(self.file_path)
+                    upload_success = True
+                    douyin_logger.info('[+] 文件上传成功（方式2：类名+文件选择器）')
+            except Exception as e:
+                douyin_logger.warning(f'[!] 方式2失败: {e}')
+        
+        # 方式3: 通过文本内容定位按钮
+        if not upload_success:
+            try:
+                upload_button = page.locator("button:has-text('上传视频')").first
+                if await upload_button.count() > 0:
+                    await upload_button.wait_for(state='visible', timeout=5000)
+                    douyin_logger.info('[+] 通过文本内容定位到上传按钮，准备上传文件...')
+                    
+                    async with page.expect_file_chooser(timeout=10000) as fc_info:
+                        await upload_button.click()
+                    file_chooser = await fc_info.value
+                    await file_chooser.set_files(self.file_path)
+                    upload_success = True
+                    douyin_logger.info('[+] 文件上传成功（方式3：文本内容+文件选择器）')
+            except Exception as e:
+                douyin_logger.warning(f'[!] 方式3失败: {e}')
+        
+        # 方式4: 直接查找隐藏的 input（兼容旧版本）
+        if not upload_success:
+            try:
+                input_element = page.locator("div[class^='container'] input[type='file']")
+                if await input_element.count() > 0:
+                    await input_element.wait_for(state='attached', timeout=5000)
+                    douyin_logger.info('[+] 找到隐藏的 input 元素，直接上传文件...')
+                    await input_element.set_input_files(self.file_path)
+                    upload_success = True
+                    douyin_logger.info('[+] 文件上传成功（方式4：直接 input）')
+            except Exception as e:
+                douyin_logger.warning(f'[!] 方式4失败: {e}')
+        
+        # 方式5: 查找任何 file 类型的 input
+        if not upload_success:
+            try:
+                input_element = page.locator("input[type='file']").first
+                if await input_element.count() > 0:
+                    await input_element.wait_for(state='attached', timeout=5000)
+                    douyin_logger.info('[+] 找到 file input 元素，直接上传文件...')
+                    await input_element.set_input_files(self.file_path)
+                    upload_success = True
+                    douyin_logger.info('[+] 文件上传成功（方式5：通用 file input）')
+            except Exception as e:
+                douyin_logger.warning(f'[!] 方式5失败: {e}')
+        
+        # 如果所有方式都失败，抛出异常
+        if not upload_success:
+            douyin_logger.error('[!] 所有上传方式都失败了！')
+            # 调试：截图和打印页面信息
+            await page.screenshot(path="debug_upload_failed.png", full_page=True)
+            douyin_logger.error('已保存调试截图: debug_upload_failed.png')
+            raise Exception("无法找到上传按钮或文件输入框，请检查页面结构是否发生变化")
 
         # 等待页面跳转到指定的 URL 2025.01.08修改在原有基础上兼容两种页面
         while True:
@@ -269,16 +389,27 @@ class DouYinVideo(object):
                     confirm_text = "是否确认应用此封面？"
                     if await page.get_by_text(confirm_text).first.is_visible():
                         print(f"  [-] 检测到确认弹窗: {confirm_text}")
-                        # 直接点击“确定”按钮，不依赖脆弱的 CSS 类名
+                        # 直接点击"确定"按钮，不依赖脆弱的 CSS 类名
                         await page.get_by_role("button", name="确定").click()
                         print("  [-] 已点击确认应用封面")
                         await asyncio.sleep(1)
+
+                    # 4. 等待封面效果检测通过
+                    print("  [-] 等待封面效果检测...")
+                    try:
+                        # 等待"封面效果检测通过"提示出现
+                        await page.wait_for_selector('span:has-text("封面效果检测通过")', timeout=30000)
+                        print("  [+] 封面效果检测通过！")
+                    except Exception as e:
+                        print(f"  [!] 等待封面检测超时或未找到提示: {e}")
+                        # 如果超时，继续执行，避免卡住
+                        print("  [!] 继续执行，但封面可能未完全检测完成")
 
                     print("  [-] 已完成封面选择流程")
                     return True
                 except Exception as e:
                     print(f"  [-] 选择封面失败: {e}")
-
+     
         return False
 
     async def set_thumbnail(self, page: Page, thumbnail_path: str):
@@ -296,6 +427,16 @@ class DouYinVideo(object):
             # if await finish_confirm_element.count():
             #     await finish_confirm_element.click()
             # await page.locator("div[class^='footer'] button:has-text('完成')").click()
+            
+            # 等待封面效果检测通过
+            douyin_logger.info('  [-] 等待封面效果检测...')
+            try:
+                # 等待"封面效果检测通过"提示出现
+                await page.wait_for_selector('span:has-text("封面效果检测通过")', timeout=30000)
+                douyin_logger.info('  [+] 封面效果检测通过！')
+            except Exception as e:
+                douyin_logger.warning(f'  [!] 等待封面检测超时或未找到提示: {e}')
+            
             douyin_logger.info('  [+] 视频封面设置完成！')
             # 等待封面设置对话框关闭
             await page.wait_for_selector("div.extractFooter", state='detached')
