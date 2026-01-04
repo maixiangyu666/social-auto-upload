@@ -72,6 +72,47 @@
           <input v-model.number="form.startDays" type="number" min="0" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
         </label>
               </div>
+
+      <!-- 抖音平台专用字段 -->
+      <div v-if="form.type === 3" class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <label class="space-y-1 md:col-span-3">
+          <div class="text-xs font-medium text-slate-600">封面图片（可选）</div>
+          <div class="flex items-center gap-2">
+            <input
+              ref="thumbnailInput"
+              type="file"
+              accept="image/*"
+              class="hidden"
+              @change="handleThumbnailChange"
+            />
+            <button
+              type="button"
+              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
+              :disabled="uploadingThumbnail"
+              @click="thumbnailInput?.click()"
+            >
+              {{ uploadingThumbnail ? '上传中...' : (form.thumbnail ? '更换封面' : '选择封面') }}
+            </button>
+            <span v-if="form.thumbnail" class="text-xs text-slate-600 truncate">{{ form.thumbnail }}</span>
+            <button
+              v-if="form.thumbnail"
+              type="button"
+              class="rounded-xl border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700 hover:bg-rose-100"
+              @click="form.thumbnail = null"
+            >
+              清除
+            </button>
+          </div>
+        </label>
+        <label class="space-y-1 md:col-span-2">
+          <div class="text-xs font-medium text-slate-600">商品链接（可选）</div>
+          <input v-model.trim="form.productLink" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="例如：https://..." />
+        </label>
+        <label class="space-y-1">
+          <div class="text-xs font-medium text-slate-600">商品标题（可选）</div>
+          <input v-model.trim="form.productTitle" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="例如：商品名称" />
+        </label>
+      </div>
     </section>
 
     <!-- Step 2: accounts -->
@@ -192,10 +233,15 @@ const form = reactive({
   videosPerDay: 1,
   dailyTimes: ['10:00'],
   startDays: 0,
+  thumbnail: null,  // 封面文件路径
+  productLink: '',  // 商品链接
+  productTitle: '', // 商品标题
 })
 
 const tagsText = ref('')
 const submitting = ref(false)
+const thumbnailInput = ref(null)
+const uploadingThumbnail = ref(false)
 
 const tags = computed(() =>
   tagsText.value
@@ -251,6 +297,53 @@ const reloadAll = async () => {
   }
 }
 
+const handleThumbnailChange = async (event) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+
+  // 验证文件类型
+  if (!file.type.startsWith('image/')) {
+    toast.error('请选择图片文件')
+    return
+  }
+
+  // 验证文件大小（例如：最大10MB）
+  const maxSize = 10 * 1024 * 1024 // 10MB
+  if (file.size > maxSize) {
+    toast.error('图片文件大小不能超过10MB')
+    return
+  }
+
+  uploadingThumbnail.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const res = await materialApi.uploadMaterial(formData)
+    if (res?.code === 200 && res?.data) {
+      // 接口返回的是 filepath 字段
+      const filePath = res.data.filepath || res.data.file_path
+      if (filePath) {
+        form.thumbnail = filePath
+        toast.success('封面上传成功')
+      } else {
+        toast.error('上传成功但未返回文件路径')
+      }
+    } else {
+      toast.error(res?.msg || '封面上传失败')
+    }
+  } catch (e) {
+    toast.error('封面上传失败')
+    console.error('封面上传错误:', e)
+  } finally {
+    uploadingThumbnail.value = false
+    // 清空input，允许重复选择同一文件
+    if (thumbnailInput.value) {
+      thumbnailInput.value.value = ''
+    }
+  }
+}
+
 const submit = async () => {
   if (!canSubmit.value) return
   submitting.value = true
@@ -266,6 +359,9 @@ const submit = async () => {
       videosPerDay: form.videosPerDay,
       dailyTimes: form.dailyTimes,
       startDays: form.startDays,
+      thumbnail: form.thumbnail || '',
+      productLink: form.productLink || '',
+      productTitle: form.productTitle || '',
     }
 
     const res = await fetch(`${apiBaseUrl}/postVideo`, {
