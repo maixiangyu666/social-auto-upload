@@ -65,12 +65,13 @@ async def douyin_cookie_gen(account_file):
 
 
 class DouYinVideo(object):
-    def __init__(self, title, file_path, tags, publish_date: datetime, account_file, thumbnail_path=None, productLink='', productTitle=''):
+    def __init__(self, title, file_path, tags, publish_date: datetime, account_file, thumbnail_path=None, productLink='', productTitle='', account_id=None):
         self.title = title  # 视频标题
         self.file_path = file_path
         self.tags = tags
         self.publish_date = publish_date
         self.account_file = account_file
+        self.account_id = account_id
         self.date_format = '%Y年%m月%d日 %H:%M'
         self.local_executable_path = LOCAL_CHROME_PATH
         self.headless = LOCAL_CHROME_HEADLESS
@@ -104,21 +105,33 @@ class DouYinVideo(object):
             browser = await playwright.chromium.launch(headless=self.headless, executable_path=self.local_executable_path)
         else:
             browser = await playwright.chromium.launch(headless=self.headless)
-        
+
         # 确保 account_file 是绝对路径字符串
         account_file_path = str(Path(self.account_file).resolve())
-        
+
         # 检查文件是否存在
         if not Path(account_file_path).exists():
             douyin_logger.error(f'[!] Cookie 文件不存在: {account_file_path}')
             await browser.close()
             raise FileNotFoundError(f'Cookie 文件不存在: {account_file_path}')
-        
+
         douyin_logger.info(f'[+] 使用 Cookie 文件: {account_file_path}')
-        
+
+        # 获取代理配置（如果有关联的代理）
+        proxy_config = None
+        if self.account_id:
+            from myUtils.proxy_helper import get_proxy_config_dict
+            proxy_config = get_proxy_config_dict(self.account_id)
+
+        # 创建浏览器上下文配置
+        context_config = {"storage_state": account_file_path}
+        if proxy_config:
+            context_config["proxy"] = proxy_config
+            print(f"[DouYin Upload] Using proxy: {proxy_config}")
+
         # 创建一个浏览器上下文，使用指定的 cookie 文件
         try:
-            context = await browser.new_context(storage_state=account_file_path)
+            context = await browser.new_context(**context_config)
         except Exception as e:
             douyin_logger.error(f'[!] 加载 Cookie 文件失败: {e}')
             await browser.close()
@@ -128,8 +141,8 @@ class DouYinVideo(object):
         # 创建一个新的页面
         page = await context.new_page()
         # 🔍 在这里添加 pause 来调试 cookie 加载
-        await page.pause()  # 会打开 Playwright Inspector
-
+        
+        await page.goto("https://creator.douyin.com/creator-micro/content/upload")
         douyin_logger.info(f'[+]正在上传-------{self.title}.mp4')
         # 等待页面跳转到指定的 URL，没进入，则自动等待到超时
         douyin_logger.info(f'[-] 正在打开主页...')

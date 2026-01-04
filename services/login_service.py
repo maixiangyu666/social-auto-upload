@@ -89,6 +89,7 @@ class LoginService:
         *,
         account_id: Optional[int] = None,
         session_id: Optional[str] = None,
+        proxy_id: Optional[int] = None,
     ) -> Dict:
         """
         统一登录入口
@@ -99,13 +100,14 @@ class LoginService:
             status_queue: SSE/状态队列
             account_id: 传入则更新该账号（刷新Cookie）
             session_id: 手动登录用会话ID（6/7），由外部生成并用于 confirm
+            proxy_id: 代理ID（可选），用于登录时使用代理
         """
 
         def push(payload: Dict):
             # 统一以 JSON 字符串推送，前端可解析
             status_queue.put(json.dumps(payload, ensure_ascii=False))
 
-        push({"event": "start", "platform_type": platform_type, "account_name": account_name, "session_id": session_id})
+        push({"event": "start", "platform_type": platform_type, "account_name": account_name, "session_id": session_id, "proxy_id": proxy_id})
 
         cookie_file: Optional[str] = None
         manual_sess: Optional[ManualLoginSession] = None
@@ -114,13 +116,13 @@ class LoginService:
             if platform_type in (1, 2, 3, 4):
                 # 二维码扫码：登录函数会推送二维码信息到队列，并在成功后返回 cookie 文件名
                 if platform_type == 1:
-                    cookie_file = await xiaohongshu_cookie_gen(account_name, status_queue)
+                    cookie_file = await xiaohongshu_cookie_gen(account_name, status_queue, account_id, proxy_id)
                 elif platform_type == 2:
-                    cookie_file = await get_tencent_cookie(account_name, status_queue)
+                    cookie_file = await get_tencent_cookie(account_name, status_queue, account_id, proxy_id)
                 elif platform_type == 3:
-                    cookie_file = await douyin_cookie_gen(account_name, status_queue)
+                    cookie_file = await douyin_cookie_gen(account_name, status_queue, account_id, proxy_id)
                 elif platform_type == 4:
-                    cookie_file = await get_ks_cookie(account_name, status_queue)
+                    cookie_file = await get_ks_cookie(account_name, status_queue, account_id, proxy_id)
 
             elif platform_type in (6, 7):
                 # 手动登录：需要前端 confirm 才继续
@@ -175,15 +177,16 @@ class LoginService:
                 return {"success": True, "account_id": account_id, "filePath": cookie_file}
 
             # 新增账号：必须入库成功后才推送 success
-            print(f"[LoginService] creating account: type={platform_type}, userName={account_name}, filePath={cookie_file}")
-            new_id = self.account_service.create_account(
-                {
-                    "type": platform_type,
-                    "filePath": cookie_file,
-                    "userName": account_name,
-                    "status": AccountService.STATUS_VALID,
-                }
-            )
+            print(f"[LoginService] creating account: type={platform_type}, userName={account_name}, filePath={cookie_file}, proxy_id={proxy_id}")
+            account_data = {
+                "type": platform_type,
+                "filePath": cookie_file,
+                "userName": account_name,
+                "status": AccountService.STATUS_VALID,
+            }
+            if proxy_id:
+                account_data["proxy_id"] = proxy_id
+            new_id = self.account_service.create_account(account_data)
             self.account_service.update_verify_time(new_id, True)
             self.account_service.schedule_next_refresh(new_id)
             push({"event": "success", "code": 200, "msg": "登录成功", "account_id": new_id, "filePath": cookie_file})

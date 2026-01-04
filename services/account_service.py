@@ -214,7 +214,7 @@ class AccountService:
     def create_account(self, data: Dict) -> int:
         """
         创建账号
-        
+
         Args:
             data: 账号数据
                 - type: 平台类型
@@ -224,30 +224,31 @@ class AccountService:
                 - tags: 标签列表（可选）
                 - auto_refresh_enabled: 是否启用自动刷新（默认1）
                 - refresh_interval_days: 刷新间隔天数（默认7）
-        
+                - proxy_id: 代理ID（可选）
+
         Returns:
             账号ID
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        
+
         try:
             # 计算下次刷新时间
             next_refresh_time = None
             if data.get('auto_refresh_enabled', 1):
                 interval_days = data.get('refresh_interval_days', 7)
                 next_refresh_time = datetime.now() + timedelta(days=interval_days)
-            
+
             # 处理 tags
             tags_json = json.dumps(data.get('tags', [])) if data.get('tags') else None
-            
+
             cursor.execute("""
                 INSERT INTO user_info (
                     type, filePath, userName, status,
                     group_id, tags,
                     auto_refresh_enabled, refresh_interval_days, next_refresh_time,
-                    publish_count, success_count, fail_count
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    publish_count, success_count, fail_count, proxy_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 data['type'],
                 data['filePath'],
@@ -258,9 +259,10 @@ class AccountService:
                 data.get('auto_refresh_enabled', 1),
                 data.get('refresh_interval_days', 7),
                 next_refresh_time.strftime('%Y-%m-%d %H:%M:%S') if next_refresh_time else None,
-                0, 0, 0
+                0, 0, 0,
+                data.get('proxy_id')
             ))
-            
+
             account_id = cursor.lastrowid
             conn.commit()
             return account_id
@@ -337,7 +339,11 @@ class AccountService:
             if 'remark' in data:
                 updates.append("remark = ?")
                 params.append(data['remark'])
-            
+
+            if 'proxy_id' in data:
+                updates.append("proxy_id = ?")
+                params.append(data['proxy_id'])
+
             if not updates:
                 return False
             

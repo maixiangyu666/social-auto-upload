@@ -12,6 +12,7 @@ from .login_routes import login_bp
 from .task_routes import task_bp
 from .group_routes import group_bp
 from .video_routes import video_bp
+from .proxy_routes import proxy_bp
 
 __all__ = [
     'static_bp',
@@ -21,5 +22,6 @@ __all__ = [
     'task_bp',
     'group_bp',
     'video_bp',
+    'proxy_bp',
 ]
 

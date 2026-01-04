@@ -149,6 +149,7 @@ class TaskExecutor:
                 title=task['title'],
                 file_path=str(video_file),
                 account_file=str(account_file),
+                account_id=task['account_id'],  # 传递 account_id 以支持代理
                 tags=tags,
                 publish_date=publish_date,
                 category=task['category'],
@@ -220,6 +221,7 @@ class TaskExecutor:
         title: str,
         file_path: str,
         account_file: str,
+        account_id: int,
         tags: list,
         publish_date,
         category: int = 0,
@@ -230,21 +232,21 @@ class TaskExecutor:
     ) -> Dict:
         """
         执行上传（调用对应的平台上传器）
-        
+
         Returns:
             {'success': True/False, 'video_id': str, 'video_url': str, 'error': str}
         """
         try:
             async with async_playwright() as playwright:
                 if platform_type == 1:  # 小红书
-                    app = XiaoHongShuVideo(title, file_path, tags, publish_date, account_file)
+                    app = XiaoHongShuVideo(title, file_path, tags, publish_date, account_file, account_id=account_id)
                 elif platform_type == 2:  # 视频号
                     category_val = TencentZoneTypes.LIFESTYLE.value if category else None
-                    app = TencentVideo(title, file_path, tags, publish_date, account_file, category_val, is_draft)
+                    app = TencentVideo(title, file_path, tags, publish_date, account_file, category_val, is_draft, account_id=account_id)
                 elif platform_type == 3:  # 抖音
-                    app = DouYinVideo(title, file_path, tags, publish_date, account_file, thumbnail_path, product_link, product_title)
+                    app = DouYinVideo(title, file_path, tags, publish_date, account_file, thumbnail_path, product_link, product_title, account_id=account_id)
                 elif platform_type == 4:  # 快手
-                    app = KSVideo(title, file_path, tags, publish_date, account_file)
+                    app = KSVideo(title, file_path, tags, publish_date, account_file, account_id=account_id)
                 else:
                     return {'success': False, 'error': f'不支持的平台类型: {platform_type}'}
                 

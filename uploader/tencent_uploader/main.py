@@ -82,12 +82,13 @@ async def weixin_setup(account_file, handle=False):
 
 
 class TencentVideo(object):
-    def __init__(self, title, file_path, tags, publish_date: datetime, account_file, category=None, is_draft=False):
+    def __init__(self, title, file_path, tags, publish_date: datetime, account_file, category=None, is_draft=False, account_id=None):
         self.title = title  # 视频标题
         self.file_path = file_path
         self.tags = tags
         self.publish_date = publish_date
         self.account_file = account_file
+        self.account_id = account_id
         self.category = category
         self.headless = LOCAL_CHROME_HEADLESS
         self.is_draft = is_draft  # 是否保存为草稿
@@ -138,8 +139,21 @@ class TencentVideo(object):
     async def upload(self, playwright: Playwright) -> None:
         # 使用 Chromium (这里使用系统内浏览器，用chromium 会造成h264错误
         browser = await playwright.chromium.launch(headless=self.headless, executable_path=self.local_executable_path)
+
+        # 获取代理配置（如果有关联的代理）
+        proxy_config = None
+        if self.account_id:
+            from myUtils.proxy_helper import get_proxy_config_dict
+            proxy_config = get_proxy_config_dict(self.account_id)
+
+        # 创建浏览器上下文配置
+        context_config = {"storage_state": f"{self.account_file}"}
+        if proxy_config:
+            context_config["proxy"] = proxy_config
+            print(f"[Tencent Upload] Using proxy: {proxy_config}")
+
         # 创建一个浏览器上下文，使用指定的 cookie 文件
-        context = await browser.new_context(storage_state=f"{self.account_file}")
+        context = await browser.new_context(**context_config)
         context = await set_init_script(context)
 
         # 创建一个新的页面

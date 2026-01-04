@@ -107,6 +107,7 @@ const nav = [
       { path: '/', label: '工作台' },
       { path: '/account-management', label: '账号管理' },
       { path: '/material-management', label: '素材管理' },
+      { path: '/proxy-management', label: '代理设置' },
     ],
   },
   {
@@ -149,6 +150,7 @@ const pageTitle = computed(() => {
   if (path.startsWith('/account-management')) return '账号管理'
   if (path.startsWith('/material-management')) return '素材管理'
   if (path.startsWith('/publish-center')) return '发布中心'
+  if (path.startsWith('/proxy-management')) return '代理设置'
   if (path.startsWith('/task-management')) return '任务管理'
   if (path.startsWith('/analytics')) return '数据统计'
   return '自媒体自动化运营系统'

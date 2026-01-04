@@ -62,7 +62,9 @@ CREATE TABLE IF NOT EXISTS user_info (
             publish_count INTEGER DEFAULT 0,          -- 发布次数
             success_count INTEGER DEFAULT 0,          -- 成功次数
             fail_count INTEGER DEFAULT 0,             -- 失败次数
-            FOREIGN KEY (group_id) REFERENCES account_groups(id) ON DELETE SET NULL
+            proxy_id INTEGER,                         -- 代理ID（关联 proxies 表）
+            FOREIGN KEY (group_id) REFERENCES account_groups(id) ON DELETE SET NULL,
+            FOREIGN KEY (proxy_id) REFERENCES proxies(id) ON DELETE SET NULL
 )
 ''')
 
@@ -185,6 +187,23 @@ CREATE TABLE IF NOT EXISTS user_info (
             UNIQUE(platform_type, account_id, stat_date),
             FOREIGN KEY (account_id) REFERENCES user_info(id) ON DELETE CASCADE
 )
+''')
+
+        # 8. 创建代理表
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS proxies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            proxy_name TEXT NOT NULL UNIQUE,         -- 代理名称（自定义）
+            proxy_type TEXT NOT NULL,                -- 代理类型：http/https/socks5
+            host TEXT NOT NULL,                      -- 代理主机地址
+            port INTEGER NOT NULL,                   -- 代理端口
+            username TEXT,                           -- 用户名（可选）
+            password TEXT,                           -- 密码（可选）
+            is_enabled INTEGER DEFAULT 1,            -- 是否启用：0禁用 1启用
+            create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+            update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+            remark TEXT                               -- 备注
+        )
 ''')
 
         # 创建索引

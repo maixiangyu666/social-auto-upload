@@ -362,7 +362,8 @@ def batch_verify_accounts_api():
             results = []
             for account in accounts:
                 if account:
-                    result = await check_cookie(account['type'], account['filePath'])
+                    # 传递 account_id 以支持代理
+                    result = await check_cookie(account['type'], account['filePath'], account['id'])
                     account_service.update_verify_time(account['id'], result)
                     results.append({
                         'account_id': account['id'],

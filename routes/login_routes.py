@@ -23,7 +23,7 @@ def init_login_routes(app_instance, queues_dict, service_instance):
     login_service = service_instance
 
 
-def run_login_async(session_id, platform_type, account_name, status_queue, account_id=None):
+def run_login_async(session_id, platform_type, account_name, status_queue, account_id=None, proxy_id=None):
     """在新线程中运行异步登录逻辑"""
     import asyncio
     loop = asyncio.new_event_loop()
@@ -36,6 +36,7 @@ def run_login_async(session_id, platform_type, account_name, status_queue, accou
                 status_queue,
                 account_id=int(account_id) if account_id else None,
                 session_id=session_id,
+                proxy_id=int(proxy_id) if proxy_id else None,
             )
         )
     except Exception as e:
@@ -68,9 +69,11 @@ def login():
     参数：
       - type: 平台类型 (1-7)
       - id: 账号名称（自定义）
+      - proxy_id: 代理ID（可选）
     """
     platform_type = request.args.get('type')
     account_name = request.args.get('id')
+    proxy_id = request.args.get('proxy_id')
     if not platform_type or not account_name:
         return jsonify({"code": 400, "msg": "缺少type或id参数", "data": None}), 400
 
@@ -83,7 +86,7 @@ def login():
     # 推送 session_id，前端手动登录时需要它进行 confirm
     status_queue.put(json.dumps({"event": "session", "session_id": session_id}, ensure_ascii=False))
 
-    thread = threading.Thread(target=run_login_async, args=(session_id, platform_type, account_name, status_queue), daemon=True)
+    thread = threading.Thread(target=run_login_async, args=(session_id, platform_type, account_name, status_queue, None, proxy_id), daemon=True)
     thread.start()
 
     response = Response(sse_stream(status_queue), mimetype='text/event-stream')

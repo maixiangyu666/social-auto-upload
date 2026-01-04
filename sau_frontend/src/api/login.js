@@ -11,8 +11,11 @@ export const loginApi = {
    * - {"event":"manual_required","session_id":"..."}
    * - {"event":"success"...} / {"event":"error"...}
    */
-  loginWithSSE(platformType, accountName) {
-    const url = `${apiBaseUrl}/login?type=${encodeURIComponent(platformType)}&id=${encodeURIComponent(accountName)}`
+  loginWithSSE(platformType, accountName, proxyId = null) {
+    let url = `${apiBaseUrl}/login?type=${encodeURIComponent(platformType)}&id=${encodeURIComponent(accountName)}`
+    if (proxyId !== null && proxyId !== undefined) {
+      url += `&proxy_id=${encodeURIComponent(proxyId)}`
+    }
     return new EventSource(url)
   },
 

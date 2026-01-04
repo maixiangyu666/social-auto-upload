@@ -5,6 +5,7 @@ export * from './material'
 export * from './task'
 export * from './group'
 export * from './login'
+export * from './proxy'
 
 // 可以在这里添加其他API模块的导出
 // export * from './product'

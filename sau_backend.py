@@ -14,7 +14,8 @@ from routes import (
     login_bp,
     task_bp,
     group_bp,
-    video_bp
+    video_bp,
+    proxy_bp
 )
 
 # 设置 Flask CLI 默认端口（用于 flask run 命令）
@@ -46,6 +47,7 @@ app.register_blueprint(login_bp)
 app.register_blueprint(task_bp)
 app.register_blueprint(group_bp)
 app.register_blueprint(video_bp)
+app.register_blueprint(proxy_bp)
 
 _scheduler = SchedulerService()
 

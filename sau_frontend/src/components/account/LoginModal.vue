@@ -38,6 +38,20 @@
                 :disabled="mode === 'refresh'"
               />
             </label>
+
+            <label class="space-y-1">
+              <div class="text-xs font-medium text-slate-600">代理（可选）</div>
+              <select
+                v-model.number="form.proxyId"
+                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+              >
+                <option :value="null">不使用代理</option>
+                <option v-for="p in proxyOptions" :key="p.id" :value="p.id">
+                  {{ p.proxy_name }} ({{ p.proxy_type.toUpperCase() }})
+                </option>
+              </select>
+              <div class="text-xs text-slate-500">关联代理后，登录和后续操作都会使用该代理</div>
+            </label>
           </div>
 
           <!-- Bilibili upload -->
@@ -123,8 +137,9 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch, onMounted } from 'vue'
 import { loginApi } from '@/api/login'
+import { proxyApi } from '@/api/proxy'
 import { toast } from '@/utils/toast'
 
 const props = defineProps({
@@ -147,9 +162,11 @@ const platformOptions = [
 
 const form = ref({
   platformType: 3,
-  accountName: ''
+  accountName: '',
+  proxyId: null
 })
 
+const proxyOptions = ref([])
 const running = ref(false)
 const status = ref('')
 const qr = ref('')
@@ -187,7 +204,23 @@ const reset = () => {
   qr.value = ''
   sessionId.value = ''
   uploadFile.value = null
+  form.value.proxyId = null
 }
+
+const loadProxies = async () => {
+  try {
+    const res = await proxyApi.getProxiesSimple()
+    if (res?.code === 200) {
+      proxyOptions.value = res.data || []
+    }
+  } catch (e) {
+    console.error('加载代理列表失败', e)
+  }
+}
+
+onMounted(() => {
+  loadProxies()
+})
 
 watch(
   () => props.open,
@@ -262,7 +295,7 @@ const handleRawMessage = (raw) => {
 }
 
 const startWithSSE = () => {
-  es = loginApi.loginWithSSE(form.value.platformType, form.value.accountName)
+  es = loginApi.loginWithSSE(form.value.platformType, form.value.accountName, form.value.proxyId)
   es.onmessage = (evt) => {
     const r = handleRawMessage(evt.data)
     if (r?.done) {

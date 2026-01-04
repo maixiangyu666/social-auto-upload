@@ -62,12 +62,13 @@ async def get_ks_cookie(account_file):
 
 
 class KSVideo(object):
-    def __init__(self, title, file_path, tags, publish_date: datetime, account_file):
+    def __init__(self, title, file_path, tags, publish_date: datetime, account_file, account_id=None):
         self.title = title  # 视频标题
         self.file_path = file_path
         self.tags = tags
         self.publish_date = publish_date
         self.account_file = account_file
+        self.account_id = account_id
         self.date_format = '%Y-%m-%d %H:%M'
         self.local_executable_path = LOCAL_CHROME_PATH
         self.headless = LOCAL_CHROME_HEADLESS
@@ -87,8 +88,22 @@ class KSVideo(object):
         else:
             browser = await playwright.chromium.launch(
                 headless=self.headless
-            )  # 创建一个浏览器上下文，使用指定的 cookie 文件
-        context = await browser.new_context(storage_state=f"{self.account_file}")
+            )
+
+        # 获取代理配置（如果有关联的代理）
+        proxy_config = None
+        if self.account_id:
+            from myUtils.proxy_helper import get_proxy_config_dict
+            proxy_config = get_proxy_config_dict(self.account_id)
+
+        # 创建浏览器上下文配置
+        context_config = {"storage_state": f"{self.account_file}"}
+        if proxy_config:
+            context_config["proxy"] = proxy_config
+            print(f"[Kuaishou Upload] Using proxy: {proxy_config}")
+
+        # 创建一个浏览器上下文，使用指定的 cookie 文件
+        context = await browser.new_context(**context_config)
         context = await set_init_script(context)
         # 创建一个新的页面
         page = await context.new_page()

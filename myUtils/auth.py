@@ -15,10 +15,22 @@ from uploader.baijiahao_uploader.main import cookie_auth as cookie_auth_baijiaha
 from uploader.tk_uploader.main_chrome import cookie_auth as cookie_auth_tiktok
 
 
-async def cookie_auth_douyin(account_file):
+async def cookie_auth_douyin(account_file, account_id=None):
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=LOCAL_CHROME_HEADLESS)
-        context = await browser.new_context(storage_state=account_file)
+
+        # 获取代理配置（如果有关联的代理）
+        proxy_config = None
+        if account_id:
+            from myUtils.proxy_helper import get_proxy_config_dict
+            proxy_config = get_proxy_config_dict(account_id)
+
+        context_config = {"storage_state": str(account_file)}
+        if proxy_config:
+            context_config["proxy"] = proxy_config
+            print(f"[Douyin Auth] Using proxy: {proxy_config}")
+
+        context = await browser.new_context(**context_config)
         context = await set_init_script(context)
         # 创建一个新的页面
         page = await context.new_page()
@@ -43,10 +55,22 @@ async def cookie_auth_douyin(account_file):
             return False
 
 
-async def cookie_auth_tencent(account_file):
+async def cookie_auth_tencent(account_file, account_id=None):
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=LOCAL_CHROME_HEADLESS)
-        context = await browser.new_context(storage_state=account_file)
+
+        # 获取代理配置（如果有关联的代理）
+        proxy_config = None
+        if account_id:
+            from myUtils.proxy_helper import get_proxy_config_dict
+            proxy_config = get_proxy_config_dict(account_id)
+
+        context_config = {"storage_state": str(account_file)}
+        if proxy_config:
+            context_config["proxy"] = proxy_config
+            print(f"[Tencent Auth] Using proxy: {proxy_config}")
+
+        context = await browser.new_context(**context_config)
         context = await set_init_script(context)
         # 创建一个新的页面
         page = await context.new_page()
@@ -61,10 +85,22 @@ async def cookie_auth_tencent(account_file):
             return True
 
 
-async def cookie_auth_ks(account_file):
+async def cookie_auth_ks(account_file, account_id=None):
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=LOCAL_CHROME_HEADLESS)
-        context = await browser.new_context(storage_state=account_file)
+
+        # 获取代理配置（如果有关联的代理）
+        proxy_config = None
+        if account_id:
+            from myUtils.proxy_helper import get_proxy_config_dict
+            proxy_config = get_proxy_config_dict(account_id)
+
+        context_config = {"storage_state": str(account_file)}
+        if proxy_config:
+            context_config["proxy"] = proxy_config
+            print(f"[Kuaishou Auth] Using proxy: {proxy_config}")
+
+        context = await browser.new_context(**context_config)
         context = await set_init_script(context)
         # 创建一个新的页面
         page = await context.new_page()
@@ -80,10 +116,22 @@ async def cookie_auth_ks(account_file):
             return True
 
 
-async def cookie_auth_xhs(account_file):
+async def cookie_auth_xhs(account_file, account_id=None):
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=LOCAL_CHROME_HEADLESS)
-        context = await browser.new_context(storage_state=account_file)
+
+        # 获取代理配置（如果有关联的代理）
+        proxy_config = None
+        if account_id:
+            from myUtils.proxy_helper import get_proxy_config_dict
+            proxy_config = get_proxy_config_dict(account_id)
+
+        context_config = {"storage_state": str(account_file)}
+        if proxy_config:
+            context_config["proxy"] = proxy_config
+            print(f"[Xiaohongshu Auth] Using proxy: {proxy_config}")
+
+        context = await browser.new_context(**context_config)
         context = await set_init_script(context)
         # 创建一个新的页面
         page = await context.new_page()
@@ -105,20 +153,20 @@ async def cookie_auth_xhs(account_file):
             return True
 
 
-async def check_cookie(type, file_path):
+async def check_cookie(type, file_path, account_id=None):
     match type:
         # 小红书
         case 1:
-            return await cookie_auth_xhs(Path(BASE_DIR / "cookiesFile" / file_path))
+            return await cookie_auth_xhs(Path(BASE_DIR / "cookiesFile" / file_path), account_id)
         # 视频号
         case 2:
-            return await cookie_auth_tencent(Path(BASE_DIR / "cookiesFile" / file_path))
+            return await cookie_auth_tencent(Path(BASE_DIR / "cookiesFile" / file_path), account_id)
         # 抖音
         case 3:
-            return await cookie_auth_douyin(Path(BASE_DIR / "cookiesFile" / file_path))
+            return await cookie_auth_douyin(Path(BASE_DIR / "cookiesFile" / file_path), account_id)
         # 快手
         case 4:
-            return await cookie_auth_ks(Path(BASE_DIR / "cookiesFile" / file_path))
+            return await cookie_auth_ks(Path(BASE_DIR / "cookiesFile" / file_path), account_id)
         # Bilibili（Cookie上传：做基本结构校验）
         case 5:
             try:

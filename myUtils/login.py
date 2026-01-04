@@ -10,7 +10,7 @@ from pathlib import Path
 from conf import BASE_DIR, LOCAL_CHROME_HEADLESS
 
 # 抖音登录
-async def douyin_cookie_gen(id, status_queue):
+async def douyin_cookie_gen(id, status_queue, account_id=None, proxy_id=None):
     url_changed_event = asyncio.Event()
     async def on_url_change():
         # 检查是否是主框架的变化
@@ -22,8 +22,25 @@ async def douyin_cookie_gen(id, status_queue):
         }
         # Make sure to run headed.
         browser = await playwright.chromium.launch(**options)
+
+        # 获取代理配置（优先使用 proxy_id，否则从 account_id 获取）
+        proxy_config = None
+        if proxy_id:
+            from myUtils.proxy_helper import get_proxy_by_id
+            proxy_config = get_proxy_by_id(proxy_id)
+        elif account_id:
+            from myUtils.proxy_helper import get_proxy_config_dict
+            proxy_config = get_proxy_config_dict(account_id)
+
         # Setup context however you like.
-        context = await browser.new_context()  # Pass any options
+        context_config = {}
+        if proxy_config:
+            context_config['proxy'] = proxy_config
+            print(f"[Douyin Login] Using proxy: {proxy_config}")
+        else:
+            print("[Douyin Login] No proxy configured")
+
+        context = await browser.new_context(**context_config)
         context = await set_init_script(context)
         # Pause the page, and start recording manually.
         page = await context.new_page()
@@ -70,7 +87,7 @@ async def douyin_cookie_gen(id, status_queue):
 
 
 # 视频号登录
-async def get_tencent_cookie(id, status_queue):
+async def get_tencent_cookie(id, status_queue, account_id=None, proxy_id=None):
     url_changed_event = asyncio.Event()
     async def on_url_change():
         # 检查是否是主框架的变化
@@ -86,8 +103,25 @@ async def get_tencent_cookie(id, status_queue):
         }
         # Make sure to run headed.
         browser = await playwright.chromium.launch(**options)
+
+        # 获取代理配置（优先使用 proxy_id，否则从 account_id 获取）
+        proxy_config = None
+        if proxy_id:
+            from myUtils.proxy_helper import get_proxy_by_id
+            proxy_config = get_proxy_by_id(proxy_id)
+        elif account_id:
+            from myUtils.proxy_helper import get_proxy_config_dict
+            proxy_config = get_proxy_config_dict(account_id)
+
         # Setup context however you like.
-        context = await browser.new_context()  # Pass any options
+        context_config = {}
+        if proxy_config:
+            context_config['proxy'] = proxy_config
+            print(f"[Tencent Login] Using proxy: {proxy_config}")
+        else:
+            print("[Tencent Login] No proxy configured")
+
+        context = await browser.new_context(**context_config)
         # Pause the page, and start recording manually.
         context = await set_init_script(context)
         page = await context.new_page()
@@ -140,7 +174,7 @@ async def get_tencent_cookie(id, status_queue):
         return f"{uuid_v1}.json"
 
 # 快手登录
-async def get_ks_cookie(id, status_queue):
+async def get_ks_cookie(id, status_queue, account_id=None, proxy_id=None):
     url_changed_event = asyncio.Event()
     async def on_url_change():
         # 检查是否是主框架的变化
@@ -155,8 +189,25 @@ async def get_ks_cookie(id, status_queue):
         }
         # Make sure to run headed.
         browser = await playwright.chromium.launch(**options)
+
+        # 获取代理配置（优先使用 proxy_id，否则从 account_id 获取）
+        proxy_config = None
+        if proxy_id:
+            from myUtils.proxy_helper import get_proxy_by_id
+            proxy_config = get_proxy_by_id(proxy_id)
+        elif account_id:
+            from myUtils.proxy_helper import get_proxy_config_dict
+            proxy_config = get_proxy_config_dict(account_id)
+
         # Setup context however you like.
-        context = await browser.new_context()  # Pass any options
+        context_config = {}
+        if proxy_config:
+            context_config['proxy'] = proxy_config
+            print(f"[Kuaishou Login] Using proxy: {proxy_config}")
+        else:
+            print("[Kuaishou Login] No proxy configured")
+
+        context = await browser.new_context(**context_config)
         context = await set_init_script(context)
         # Pause the page, and start recording manually.
         page = await context.new_page()
@@ -206,7 +257,7 @@ async def get_ks_cookie(id, status_queue):
         return f"{uuid_v1}.json"
 
 # 小红书登录
-async def xiaohongshu_cookie_gen(id, status_queue):
+async def xiaohongshu_cookie_gen(id, status_queue, account_id=None, proxy_id=None):
     url_changed_event = asyncio.Event()
 
     async def on_url_change():
@@ -223,8 +274,25 @@ async def xiaohongshu_cookie_gen(id, status_queue):
         }
         # Make sure to run headed.
         browser = await playwright.chromium.launch(**options)
+
+        # 获取代理配置（优先使用 proxy_id，否则从 account_id 获取）
+        proxy_config = None
+        if proxy_id:
+            from myUtils.proxy_helper import get_proxy_by_id
+            proxy_config = get_proxy_by_id(proxy_id)
+        elif account_id:
+            from myUtils.proxy_helper import get_proxy_config_dict
+            proxy_config = get_proxy_config_dict(account_id)
+
         # Setup context however you like.
-        context = await browser.new_context()  # Pass any options
+        context_config = {}
+        if proxy_config:
+            context_config['proxy'] = proxy_config
+            print(f"[Xiaohongshu Login] Using proxy: {proxy_config}")
+        else:
+            print("[Xiaohongshu Login] No proxy configured")
+
+        context = await browser.new_context(**context_config)
         context = await set_init_script(context)
         # Pause the page, and start recording manually.
         page = await context.new_page()

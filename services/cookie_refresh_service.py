@@ -106,7 +106,19 @@ class CookieRefreshService:
                 if LOCAL_CHROME_PATH and Path(LOCAL_CHROME_PATH).exists():
                     options["executable_path"] = LOCAL_CHROME_PATH
                 browser = await playwright.chromium.launch(**options)
-                context = await browser.new_context(storage_state=str(cookie_file))
+
+                # 获取代理配置（如果有关联的代理）
+                proxy_config = None
+                if account_id:
+                    from myUtils.proxy_helper import get_proxy_config_dict
+                    proxy_config = get_proxy_config_dict(account_id)
+
+                context_config = {"storage_state": str(cookie_file)}
+                if proxy_config:
+                    context_config["proxy"] = proxy_config
+                    print(f"[Cookie Refresh] Using proxy: {proxy_config}")
+
+                context = await browser.new_context(**context_config)
                 context = await set_init_script(context)
                 page = await context.new_page()
 
@@ -121,8 +133,8 @@ class CookieRefreshService:
                 await context.close()
                 await browser.close()
 
-            # 校验刷新后的 cookie 是否可用
-            ok = await check_cookie(platform_type, cookie_name)
+            # 校验刷新后的 cookie 是否可用（传递 account_id 以支持代理）
+            ok = await check_cookie(platform_type, cookie_name, account_id)
             duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
             if ok:
                 self._log_refresh_result(account_id, platform_type, True, None, duration_ms, verify_method='auto_refresh_background')
@@ -192,8 +204,8 @@ class CookieRefreshService:
             if not new_file_path:
                 return {'success': False, 'message': '无法获取新的Cookie文件路径'}
 
-            # 再次验证（LoginService 已验证，这里做双保险）
-            verify_result = await check_cookie(platform_type, new_file_path)
+            # 再次验证（LoginService 已验证，这里做双保险，传递 account_id 以支持代理）
+            verify_result = await check_cookie(platform_type, new_file_path, account_id)
             if not verify_result:
                 duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
                 error_msg = '新生成的Cookie验证失败'
